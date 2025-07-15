@@ -1,5 +1,5 @@
 #include "window.h"
-#include "shared.h"
+#include "shared.inl"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -94,7 +94,6 @@ void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView unifor
         .name = "upload uniform data",
     });
 }
-
 
 void draw_mesh_task(
     daxa::TaskGraph& tg,
@@ -209,8 +208,8 @@ int main(int argc, char const* argv[]) {
     std::shared_ptr<daxa::RasterPipeline> pipeline;
     {
         auto result = pipeline_manager.add_raster_pipeline2({
-            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.glsl"}},
-            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.glsl"}},
+            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.vert.glsl"}},
+            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.frag.glsl"}},
             .color_attachments = {{.format = swapchain.get_format()}},
             .depth_test = daxa::DepthTestInfo{
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,

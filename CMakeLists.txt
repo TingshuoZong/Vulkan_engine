@@ -28,7 +28,27 @@ foreach(SHADER_FILE ${SHADER_FILES})
     configure_file(${SHADER_FILE} ${SHADERS_DST_DIR}/${FILE_NAME} COPYONLY)
 endforeach()
 
-file(GLOB_RECURSE SRCS ${PROJECT_SOURCE_DIR}/src/*.cpp src/*.hpp src/*.h)
+file(GLOB_RECURSE SRCS
+    ${PROJECT_SOURCE_DIR}/src/*.cpp
+    ${PROJECT_SOURCE_DIR}/src/*.hpp
+    ${PROJECT_SOURCE_DIR}/src/*.h
+)
+
+if(MSVC)
+    # Arrange groups in Visual Studio
+    foreach(source_file IN LISTS SRCS)
+        file(RELATIVE_PATH source_path "${PROJECT_SOURCE_DIR}/src" "${source_file}")
+        get_filename_component(source_dir "${source_path}" PATH)
+        string(REPLACE "/" "\\" source_group "${source_dir}")
+        if(source_group STREQUAL "")
+            set(source_group "Source Files")
+        else()
+            set(source_group "Source Files\\${source_group}")
+        endif()
+    
+        source_group("${source_group}" FILES "${source_file}")
+    endforeach()
+endif()
 
 message("src files:")
 foreach(file ${SRCS})
@@ -40,7 +60,8 @@ add_executable(${PROJECT_NAME} ${SRCS})
 target_include_directories(${PROJECT_NAME} PUBLIC 
     ${PROJECT_SOURCE_DIR}/shaders
     ${PROJECT_SOURCE_DIR}/lib/glm
-    include
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src
 )
 
 find_package(glfw3 CONFIG REQUIRED)
