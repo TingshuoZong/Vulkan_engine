@@ -1,6 +1,7 @@
 #include "window.h"
 #include "shared.inl"
 
+#include "Core/Drawable.h"
 #include "Core/Camera.h"
 #include "Core/InputSystem.h"
 
@@ -9,6 +10,8 @@
 #include <daxa/utils/task_graph.hpp>
 
 #include <iostream>
+
+constexpr size_t MAX_INSTANCE_COUNT = 1024;
 
 void upload_mesh_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, daxa::TaskBufferView indices) {
     tg.add_task({
@@ -104,12 +107,15 @@ void draw_mesh_task(
     daxa::TaskBufferView vertices,
     daxa::TaskBufferView indices,
     daxa::TaskImageView z_buffer,
+    daxa::TaskBufferView task_instance_buffer,
+    std::vector<PerInstanceData> instance_data,
     daxa::TaskBufferView uniform_buffer,
     daxa::TaskImageView render_target) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, vertices),
             daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, uniform_buffer),
+            daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, task_instance_buffer),
             daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, indices),
             daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, render_target),
             daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, z_buffer),
@@ -144,9 +150,13 @@ void draw_mesh_task(
             render_recorder.push_constant(MyPushConstant{
                 .my_vertex_ptr = ti.device.device_address(ti.get(vertices).ids[0]).value(),
                 .ubo_ptr = ti.device.device_address(ti.get(uniform_buffer).ids[0]).value(),
+                .instance_buffer_ptr = ti.device.device_address(ti.get(task_instance_buffer).ids[0]).value(),
             });
 
-            render_recorder.draw_indexed({.index_count = 36});
+            render_recorder.draw_indexed({
+                .index_count = 36,
+                .instance_count = static_cast<uint32_t>(instance_data.size()),
+            });
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",
@@ -155,8 +165,7 @@ void draw_mesh_task(
 
 void update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float time, float aspect_ratio) {
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.view = ubo.view = camera.get_view_matrix();
+    ubo.view = camera.get_view_matrix();
     ubo.proj = camera.get_projection(aspect_ratio);
 
     auto* ptr = device.buffer_host_address_as<UniformBufferObject>(uniform_buffer_id).value();
@@ -237,9 +246,19 @@ int main(int argc, char const* argv[]) {
         .name = "Uniform buffer MVP",
     });
 
+    auto task_uniform_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&uniform_buffer_id, 1}},
+        .name = "task uniform buffer",
+    });
+
     auto vertex_buffer_id = device.create_buffer({
         .size = sizeof(MyVertex) * 8,
         .name = "my vertex data",
+    });
+
+    auto task_vertex_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&vertex_buffer_id, 1}},
+        .name = "task vertex buffer",
     });
 
     auto index_buffer_id = device.create_buffer({
@@ -247,7 +266,10 @@ int main(int argc, char const* argv[]) {
         .name = "index buffer",
     });
 
-    auto task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
+    auto task_index_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&index_buffer_id, 1}},
+        .name = "task index buffer",
+    });
 
     // Create the z-buffer
     auto z_buffer_id = create_z_buffer(device, swapchain);
@@ -257,33 +279,58 @@ int main(int argc, char const* argv[]) {
         .name = "task depth image",
     });
 
-    auto task_uniform_buffer = daxa::TaskBuffer({
-        .initial_buffers = {.buffers = std::span{&uniform_buffer_id, 1}},
-        .name = "task uniform buffer",
+    auto task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
+
+
+    auto instance_buffer_id = device.create_buffer({
+        .size = sizeof(PerInstanceData) * MAX_INSTANCE_COUNT,
+        .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+        .name = "Instance SSBO",
+    });
+    std::vector<PerInstanceData> instance_data;
+
+    int grid_size = 5;        // 5x5x5 grid of cubes
+    float spacing = 2.0f;     // distance between cubes
+
+    for (int x = 0; x < grid_size; ++x) {
+        for (int y = 0; y < grid_size; ++y) {
+            for (int z = 0; z < grid_size; ++z) {
+                glm::vec3 position = glm::vec3(
+                    (x - grid_size / 2) * spacing,
+                    (y - grid_size / 2) * spacing,
+                    (z - grid_size / 2) * spacing
+                );
+
+                PerInstanceData data;
+                data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                instance_data.push_back(data);
+            }
+        }
+    }
+
+    auto* ptr = device.buffer_host_address_as<PerInstanceData>(instance_buffer_id).value();
+    memcpy(ptr, instance_data.data(), instance_data.size() * sizeof(PerInstanceData));
+
+    auto task_instance_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&instance_buffer_id, 1} },
+        .name = "instance buffer"
     });
 
-    auto task_vertex_buffer = daxa::TaskBuffer({
-        .initial_buffers = {.buffers = std::span{&vertex_buffer_id, 1}},
-        .name = "task vertex buffer",
-    });
 
-    auto task_index_buffer = daxa::TaskBuffer({
-        .initial_buffers = {.buffers = std::span{&index_buffer_id, 1}},
-        .name = "task index buffer",
-    });
 
     auto loop_task_graph = daxa::TaskGraph({
         .device = device,
         .swapchain = swapchain,
         .name = "loop",
-        });
+    });
 
     loop_task_graph.use_persistent_buffer(task_vertex_buffer);
     loop_task_graph.use_persistent_buffer(task_index_buffer);
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
+    loop_task_graph.use_persistent_buffer(task_instance_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
-    draw_mesh_task(loop_task_graph, pipeline, task_vertex_buffer, task_index_buffer, task_z_buffer, task_uniform_buffer, task_swapchain_image);
+    draw_mesh_task(loop_task_graph, pipeline, task_vertex_buffer, task_index_buffer, task_z_buffer, task_instance_buffer, instance_data, task_uniform_buffer, task_swapchain_image);
 
     loop_task_graph.submit({});
     // And tell the task graph to do the present step.
@@ -342,8 +389,6 @@ int main(int argc, char const* argv[]) {
 
         InputSystem::process_input(window.get_glfw_window(), camera, delta_time);
 
-        ubo.view = camera.get_view_matrix();
-
         if (window.swapchain_out_of_date) {
             swapchain.resize();
             window.swapchain_out_of_date = false;
@@ -357,6 +402,25 @@ int main(int argc, char const* argv[]) {
         float aspect_ratio = static_cast<float>(window.width) / window.height;
         update_uniform_buffer(device, uniform_buffer_id, camera, current_time, aspect_ratio);
 
+
+        for (int x = 0; x < grid_size; ++x) {
+            for (int y = 0; y < grid_size; ++y) {
+                for (int z = 0; z < grid_size; ++z) {
+                    glm::vec3 position = glm::vec3(
+                        (x - grid_size / 2) * spacing,
+                        (y - grid_size / 2) * spacing,
+                        (z - grid_size / 2) * spacing
+                    );
+                    int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
+                    float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex); // Unique speed per instance
+                    float angle = current_time * speed;
+                    instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+                }
+            }
+        }
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(instance_buffer_id).value();
+        std::memcpy(ptr, instance_data.data(), instance_data.size() * sizeof(PerInstanceData));
+
         auto swapchain_image = swapchain.acquire_next_image();
         if (swapchain_image.is_empty()) {   
             continue;
@@ -369,6 +433,7 @@ int main(int argc, char const* argv[]) {
     }
 
     device.destroy_image(z_buffer_id);
+    device.destroy_buffer(instance_buffer_id);
     device.destroy_buffer(uniform_buffer_id);
     device.destroy_buffer(vertex_buffer_id);
     device.destroy_buffer(index_buffer_id);

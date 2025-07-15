@@ -1,6 +1,8 @@
 #include "InputSystem.h"
 
 namespace InputSystem {
+    bool cursor_captured = true;
+
     void process_input(GLFWwindow* window, Camera& camera, float delta_time) {
         float velocity = camera.movement_speed * delta_time;
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -15,6 +17,10 @@ namespace InputSystem {
             camera.position += camera.up * velocity;
         if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
             camera.position -= camera.up * velocity;
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            cursor_captured = false;
+        }
     }
 
     void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
@@ -49,5 +55,10 @@ namespace InputSystem {
             camera.pitch = -89.0f;
 
         camera.update_vectors();
+
+        if (!cursor_captured && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            cursor_captured = true;
+        }
     }
 }
