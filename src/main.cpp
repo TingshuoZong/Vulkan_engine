@@ -1,5 +1,5 @@
 #include "window.h"
-#include "shared.inl"
+#include "shared.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -7,69 +7,100 @@
 
 #include <iostream>
 
-
-// 8 vertices for the cube corners, with position and color
-auto vertices = std::array<MyVertex, 8>{
-    MyVertex{.position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0}},
-    MyVertex{.position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0}},
-    MyVertex{.position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1}},
-    MyVertex{.position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0}},
-    MyVertex{.position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1}},
-    MyVertex{.position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1}},
-    MyVertex{.position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1}},
-    MyVertex{.position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0}},
-};
-
-// 36 indices (12 triangles) to form the cube faces
-auto indices = std::array<uint32_t, 36>{
-    // front face
-    0, 1, 2,  2, 3, 0,
-    // right face
-    1, 5, 6,  6, 2, 1,
-    // back face
-    5, 4, 7,  7, 6, 5,
-    // left face
-    4, 0, 3,  3, 7, 4,
-    // top face
-    3, 2, 6,  6, 7, 3,
-    // bottom face
-    4, 5, 1,  1, 0, 4,
-};
-
-void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices) {
+void upload_mesh_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, daxa::TaskBufferView indices) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, vertices),
+            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, indices),
         },
         .task = [=](daxa::TaskInterface ti) {
-            auto data = std::array{
-                MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-                MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-                MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+            auto vertex_data = std::array<MyVertex, 8>{
+                MyVertex{.position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0}},
+                MyVertex{.position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0}},
+                MyVertex{.position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1}},
+                MyVertex{.position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0}},
+                MyVertex{.position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1}},
+                MyVertex{.position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1}},
+                MyVertex{.position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1}},
+                MyVertex{.position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0}}
             };
-            auto staging_buffer_id = ti.device.create_buffer({
-                .size = sizeof(data),
-                .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
-                .name = "my staging buffer",
+            auto index_data = std::array<uint32_t, 36>{ // front face
+                0, 1, 2,  2, 3, 0,
+                // right face
+                1, 5, 6,  6, 2, 1,
+                // back face
+                5, 4, 7,  7, 6, 5,
+                // left face
+                4, 0, 3,  3, 7, 4,
+                // top face
+                3, 2, 6,  6, 7, 3,
+                // bottom face
+                4, 5, 1,  1, 0, 4 
+            };
+
+            auto vertex_staging = ti.device.create_buffer({
+                           .size = sizeof(vertex_data),
+                           .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+                           .name = "vertex staging buffer",
             });
-            ti.recorder.destroy_buffer_deferred(staging_buffer_id);
-            auto* buffer_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, 3>>(staging_buffer_id).value();
-            *buffer_ptr = data;
+            ti.recorder.destroy_buffer_deferred(vertex_staging);
+            auto* vertex_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, 8>>(vertex_staging).value();
+            *vertex_ptr = vertex_data;
             ti.recorder.copy_buffer_to_buffer({
-                .src_buffer = staging_buffer_id,
+                .src_buffer = vertex_staging,
                 .dst_buffer = ti.get(vertices).ids[0],
-                .size = sizeof(data),
+                .size = sizeof(vertex_data),
+            });
+
+            auto index_staging = ti.device.create_buffer({
+                .size = sizeof(index_data),
+                .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+                .name = "index staging buffer",
+                });
+            ti.recorder.destroy_buffer_deferred(index_staging);
+            auto* index_ptr = ti.device.buffer_host_address_as<std::array<uint32_t, 36>>(index_staging).value();
+            *index_ptr = index_data;
+            ti.recorder.copy_buffer_to_buffer({
+                .src_buffer = index_staging,
+                .dst_buffer = ti.get(indices).ids[0],
+                .size = sizeof(index_data),
             });
         },
-        .name = "upload vertices",
+        .name = "upload mesh data",
+    });
+}
+
+void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, UniformBufferObject ubo) {
+    tg.add_task({
+        .attachments = {
+            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, uniform_buffer)
+        },
+        .task = [=](daxa::TaskInterface ti) {
+            auto uniform_staging = ti.device.create_buffer({
+                           .size = sizeof(UniformBufferObject),
+                           .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+                           .name = "uniform staging buffer",
+            });
+            ti.recorder.destroy_buffer_deferred(uniform_staging);
+            auto* uniform_ptr = ti.device.buffer_host_address_as<UniformBufferObject>(uniform_staging).value();
+            *uniform_ptr = ubo;
+            ti.recorder.copy_buffer_to_buffer({
+                .src_buffer = uniform_staging,
+                .dst_buffer = ti.get(uniform_buffer).ids[0],
+                .size = sizeof(UniformBufferObject),
+            });
+        },
+        .name = "upload uniform data",
     });
 }
 
 
-void draw_vertices_task(daxa::TaskGraph& tg, std::shared_ptr<daxa::RasterPipeline> pipeline, daxa::TaskBufferView vertices, daxa::TaskImageView render_target) {
+void draw_mesh_task(daxa::TaskGraph& tg, std::shared_ptr<daxa::RasterPipeline> pipeline, daxa::TaskBufferView vertices, daxa::TaskBufferView indices, daxa::TaskBufferView uniform_buffer, daxa::TaskImageView render_target) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, vertices),
+            daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, uniform_buffer),
+            daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, indices),
             daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, render_target),
         },
         .task = [=](daxa::TaskInterface ti) {
@@ -87,14 +118,38 @@ void draw_vertices_task(daxa::TaskGraph& tg, std::shared_ptr<daxa::RasterPipelin
             });
 
             render_recorder.set_pipeline(*pipeline);
+
+            render_recorder.set_index_buffer({
+                .id = ti.get(indices).ids[0],
+                .offset = 0,
+                .index_type = daxa::IndexType::uint32,
+            });
+
             render_recorder.push_constant(MyPushConstant{
                 .my_vertex_ptr = ti.device.device_address(ti.get(vertices).ids[0]).value(),
+                .ubo_ptr = ti.device.device_address(ti.get(uniform_buffer).ids[0]).value(),
             });
-            render_recorder.draw({.vertex_count = 3});
+
+            render_recorder.draw_indexed({.index_count = 36});
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
-        .name = "draw vertices",
+        .name = "draw mesh",
     });
+}
+
+void update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_id, float time, float aspect_ratio) {
+    UniformBufferObject ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                           glm::vec3(0.0f, 0.0f, 0.0f),
+                           glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), aspect_ratio, 0.1f, 10.0f);
+
+    // Vulkan clip space Y is inverted, so invert proj matrix's Y here:
+    ubo.proj[1][1] *= -1;
+
+    auto* ptr = device.buffer_host_address_as<UniformBufferObject>(uniform_buffer_id).value();
+    *ptr = ubo;
 }
 
 int main(int argc, char const* argv[]) {
@@ -145,15 +200,37 @@ int main(int argc, char const* argv[]) {
         pipeline = result.value();
     }
 
-    auto buffer_id = device.create_buffer({
-        .size = sizeof(MyVertex) * 3,
+    auto uniform_buffer_id = device.create_buffer({
+        .size = sizeof(UniformBufferObject),
+        .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+        .name = "Uniform buffer MVP",
+    });
+
+    auto vertex_buffer_id = device.create_buffer({
+        .size = sizeof(MyVertex) * 8,
         .name = "my vertex data",
     });
 
+    auto index_buffer_id = device.create_buffer({
+        .size = sizeof(uint32_t) * 36,
+        .name = "index buffer",
+    });
+
     auto task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
+
+    auto task_uniform_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&uniform_buffer_id, 1}},
+        .name = "task uniform buffer",
+    });
+
     auto task_vertex_buffer = daxa::TaskBuffer({
-        .initial_buffers = {.buffers = std::span{&buffer_id, 1}},
+        .initial_buffers = {.buffers = std::span{&vertex_buffer_id, 1}},
         .name = "task vertex buffer",
+    });
+
+    auto task_index_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&index_buffer_id, 1}},
+        .name = "task index buffer",
     });
 
     auto loop_task_graph = daxa::TaskGraph({
@@ -161,9 +238,12 @@ int main(int argc, char const* argv[]) {
         .swapchain = swapchain,
         .name = "loop",
         });
+
     loop_task_graph.use_persistent_buffer(task_vertex_buffer);
+    loop_task_graph.use_persistent_buffer(task_index_buffer);
+    loop_task_graph.use_persistent_buffer(task_uniform_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
-    draw_vertices_task(loop_task_graph, pipeline, task_vertex_buffer, task_swapchain_image);
+    draw_mesh_task(loop_task_graph, pipeline, task_vertex_buffer, task_index_buffer, task_uniform_buffer, task_swapchain_image);
 
     loop_task_graph.submit({});
     // And tell the task graph to do the present step.
@@ -172,6 +252,17 @@ int main(int argc, char const* argv[]) {
     // dependency graph between tasks, and inserts the most optimal synchronization!
     loop_task_graph.complete({});
 
+    UniformBufferObject ubo{
+    .model = glm::mat4(1.0f),
+    .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                        glm::vec3(0.0f, 0.0f, 0.0f),
+                        glm::vec3(0.0f, 0.0f, 1.0f)),
+    .proj = glm::perspective(glm::radians(45.0f),
+                             1600.0f / 900.0f,
+                             0.1f, 10.0f),
+    };
+    ubo.proj[1][1] *= -1;  // Vulkan clip space correction
+
     {
         auto upload_task_graph = daxa::TaskGraph({
             .device = device,
@@ -179,8 +270,11 @@ int main(int argc, char const* argv[]) {
             });
 
         upload_task_graph.use_persistent_buffer(task_vertex_buffer);
+        upload_task_graph.use_persistent_buffer(task_index_buffer);
+        upload_task_graph.use_persistent_buffer(task_uniform_buffer);
 
-        upload_vertex_data_task(upload_task_graph, task_vertex_buffer);
+        upload_mesh_data_task(upload_task_graph, task_vertex_buffer, task_index_buffer);
+        upload_uniform_buffer_task(upload_task_graph, task_uniform_buffer, ubo);
 
         upload_task_graph.submit({});
         upload_task_graph.complete({});
@@ -207,7 +301,10 @@ int main(int argc, char const* argv[]) {
         device.collect_garbage();
     }
 
-    device.destroy_buffer(buffer_id);
+    device.destroy_buffer(uniform_buffer_id);
+    device.destroy_buffer(vertex_buffer_id);
+    device.destroy_buffer(index_buffer_id);
+
 
     device.wait_idle();
     device.collect_garbage();

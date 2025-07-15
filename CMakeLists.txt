@@ -16,6 +16,12 @@ file(MAKE_DIRECTORY ${SHADERS_DST_DIR})
 
 # Copy all files from source to destination
 file(GLOB SHADER_FILES "${SHADERS_SRC_DIR}/*")
+#file(GLOB SHADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.*")
+
+foreach(SHADER_FILE ${SHADER_FILES})
+    # This adds the files to the VS project but doesn¡¯t compile them
+    source_group("Shaders" FILES ${SHADER_FILE})
+endforeach()
 
 foreach(SHADER_FILE ${SHADER_FILES})
     get_filename_component(FILE_NAME ${SHADER_FILE} NAME)
@@ -33,11 +39,19 @@ add_executable(${PROJECT_NAME} ${SRCS})
 
 target_include_directories(${PROJECT_NAME} PUBLIC 
     ${PROJECT_SOURCE_DIR}/shaders
+    ${PROJECT_SOURCE_DIR}/lib/glm
     include
 )
 
 find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 
 find_package(daxa CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE daxa::daxa)
+
+target_sources(${PROJECT_NAME} PRIVATE
+    ${SHADER_FILES}
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE 
+    glfw
+    daxa::daxa
+)

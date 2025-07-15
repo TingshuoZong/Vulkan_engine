@@ -14,10 +14,16 @@ DAXA_DECL_PUSH_CONSTANT(MyPushConstant, push)
 #if DAXA_SHADER_STAGE == DAXA_SHADER_STAGE_VERTEX
 
 layout(location = 0) out daxa_f32vec3 v_col;
-void main()
-{
+
+void main() {
     MyVertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
-    gl_Position = daxa_f32vec4(vert.position, 1);
+    UniformBufferObject ubo = deref(push.ubo_ptr);
+
+    vec4 world_pos = ubo.model * vec4(vert.position, 1.0);
+    vec4 view_pos = ubo.view * world_pos;
+    gl_Position = ubo.proj * view_pos;
+
+    // gl_Position = daxa_f32vec4(vert.position, 1);
     v_col = vert.color;
 }
 
@@ -25,8 +31,7 @@ void main()
 
 layout(location = 0) in daxa_f32vec3 v_col;
 layout(location = 0) out daxa_f32vec4 color;
-void main()
-{
+void main() {
     color = daxa_f32vec4(v_col, 1);
 
     // Debug printf is not necessary, we just use it here to show how it can be used.

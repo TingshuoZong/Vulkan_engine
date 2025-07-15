@@ -1,6 +1,8 @@
-#pragma once
+
 
 #include <daxa/daxa.inl>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 struct MyVertex {
     daxa_f32vec3 position;
@@ -9,10 +11,11 @@ struct MyVertex {
 
 DAXA_DECL_BUFFER_PTR(MyVertex)
 
+
 struct UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
 };
 
 DAXA_DECL_BUFFER_PTR(UniformBufferObject)
