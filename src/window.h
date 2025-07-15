@@ -4,6 +4,7 @@
 using namespace daxa::types; // For types like `u32`
 
 #include <GLFW/glfw3.h>
+#include "Core/Camera.h"
 
 #if defined(_WIN32)
     #define GLFW_EXPOSE_NATIVE_WIN32
@@ -21,6 +22,8 @@ struct AppWindow {
     u32 width, height;           // Dimensions of the window
     bool minimized = false;      // Tracks if the window is minimized
     bool swapchain_out_of_date = false; // Tracks if the swapchain needs updating
+
+    Camera* camera_ptr = nullptr;
 
     explicit AppWindow(char const* window_name, u32 sx = 1600, u32 sy = 900)
         : width{ sx }, height{ sy } {
@@ -44,7 +47,7 @@ struct AppWindow {
             win->width = static_cast<u32>(size_x);
             win->height = static_cast<u32>(size_y);
             win->swapchain_out_of_date = true;
-            });
+        });
     }
 
     ~AppWindow() {

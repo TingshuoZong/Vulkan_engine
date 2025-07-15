@@ -1,9 +1,12 @@
 #include "InputSystem.h"
 
 namespace InputSystem {
-    bool cursor_captured = true;
+    bool mouse_captured = true;
 
     void process_input(GLFWwindow* window, Camera& camera, float delta_time) {
+        auto* app = static_cast<AppWindow*>(glfwGetWindowUserPointer(window));
+        if (!app || !app->camera_ptr) return;
+
         float velocity = camera.movement_speed * delta_time;
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             camera.position += camera.front * velocity;
@@ -17,9 +20,8 @@ namespace InputSystem {
             camera.position += camera.up * velocity;
         if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
             camera.position -= camera.up * velocity;
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            cursor_captured = false;
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && mouse_captured) {
+            app->set_mouse_capture(false);
         }
     }
 
@@ -28,9 +30,10 @@ namespace InputSystem {
         static float last_x = 800.0f / 2;
         static float last_y = 600.0f / 2;
 
-        static Camera* cam_ptr = reinterpret_cast<Camera*>(glfwGetWindowUserPointer(window));
-        if (!cam_ptr) return;
-        Camera& camera = *cam_ptr;
+        auto* app = static_cast<AppWindow*>(glfwGetWindowUserPointer(window));
+        if (!app || !app->camera_ptr) return;
+
+        Camera& camera = *app->camera_ptr;
 
         if (first_mouse) {
             last_x = xpos;
@@ -39,7 +42,7 @@ namespace InputSystem {
         }
 
         float xoffset = xpos - last_x;
-        float yoffset = last_y - ypos;  // reversed since y-coordinates go from bottom to top
+        float yoffset = last_y - ypos;  // Reversed since y-coordinates go bottom-to-top
         last_x = xpos;
         last_y = ypos;
 
@@ -49,16 +52,14 @@ namespace InputSystem {
         camera.yaw += xoffset;
         camera.pitch += yoffset;
 
-        if (camera.pitch > 89.0f)
-            camera.pitch = 89.0f;
-        if (camera.pitch < -89.0f)
-            camera.pitch = -89.0f;
+        if (camera.pitch > 89.0f) camera.pitch = 89.0f;
+        if (camera.pitch < -89.0f) camera.pitch = -89.0f;
 
         camera.update_vectors();
 
-        if (!cursor_captured && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            cursor_captured = true;
-        }
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+			app->set_mouse_capture(true);
+            std::cout << "Attempting to capture mouse" << std::endl;
+		}
     }
 }
