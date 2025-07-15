@@ -24,18 +24,19 @@ void upload_mesh_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, d
                 MyVertex{.position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1}},
                 MyVertex{.position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0}}
             };
-            auto index_data = std::array<uint32_t, 36>{ // front face
-                0, 1, 2,  2, 3, 0,
+            auto index_data = std::array<uint32_t, 36>{ 
+                // front face
+                0, 2, 1,  2, 0, 3,
                 // right face
-                1, 5, 6,  6, 2, 1,
+                1, 6, 5,  6, 1, 2,
                 // back face
-                5, 4, 7,  7, 6, 5,
+                5, 7, 4,  7, 5, 6,
                 // left face
-                4, 0, 3,  3, 7, 4,
+                4, 3, 0,  3, 4, 7,
                 // top face
-                3, 2, 6,  6, 7, 3,
+                3, 6, 2,  6, 3, 7,
                 // bottom face
-                4, 5, 1,  1, 0, 4 
+                4, 1, 5,  1, 4, 0,
             };
 
             auto vertex_staging = ti.device.create_buffer({
@@ -95,13 +96,21 @@ void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView unifor
 }
 
 
-void draw_mesh_task(daxa::TaskGraph& tg, std::shared_ptr<daxa::RasterPipeline> pipeline, daxa::TaskBufferView vertices, daxa::TaskBufferView indices, daxa::TaskBufferView uniform_buffer, daxa::TaskImageView render_target) {
+void draw_mesh_task(
+    daxa::TaskGraph& tg,
+    std::shared_ptr<daxa::RasterPipeline> pipeline,
+    daxa::TaskBufferView vertices,
+    daxa::TaskBufferView indices,
+    daxa::TaskImageView z_buffer,
+    daxa::TaskBufferView uniform_buffer,
+    daxa::TaskImageView render_target) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, vertices),
             daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, uniform_buffer),
             daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, indices),
             daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, render_target),
+            daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, z_buffer),
         },
         .task = [=](daxa::TaskInterface ti) {
             auto const size = ti.device.info(ti.get(render_target).ids[0]).value().size;
@@ -113,6 +122,11 @@ void draw_mesh_task(daxa::TaskGraph& tg, std::shared_ptr<daxa::RasterPipeline> p
                         .load_op = daxa::AttachmentLoadOp::CLEAR,
                         .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
                     },
+                },
+                .depth_attachment = daxa::RenderAttachmentInfo{
+                    .image_view = ti.get(z_buffer).view_ids[0],
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = daxa::DepthValue{1.0f, 0},
                 },
                 .render_area = {.width = size.x, .height = size.y},
             });
@@ -152,6 +166,16 @@ void update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_i
     *ptr = ubo;
 }
 
+daxa::ImageId create_z_buffer(daxa::Device& device, daxa::Swapchain const& swapchain) {
+    auto size = swapchain.get_surface_extent();
+    return device.create_image({
+        .format = daxa::Format::D32_SFLOAT,
+        .size = {size.x, size.y, 1},
+        .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
+        .name = "z-buffer",
+    });
+}
+
 int main(int argc, char const* argv[]) {
     (void)argc;
     (void)argv;
@@ -188,7 +212,17 @@ int main(int argc, char const* argv[]) {
             .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.glsl"}},
             .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.glsl"}},
             .color_attachments = {{.format = swapchain.get_format()}},
-            .raster = {},
+            .depth_test = daxa::DepthTestInfo{
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_write = true,                      // enable writing to depth buffer
+                .depth_test_compare_op = daxa::CompareOp::LESS_OR_EQUAL,
+                .min_depth_bounds = 0.0f,
+                .max_depth_bounds = 1.0f,
+            },
+            .raster = daxa::RasterizerInfo{
+                .face_culling = daxa::FaceCullFlagBits::BACK_BIT, // Optional but recommended
+                .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE, // Adjust to match your index winding
+            },
             .push_constant_size = sizeof(MyPushConstant),
             .name = "my pipeline",
         });
@@ -218,6 +252,14 @@ int main(int argc, char const* argv[]) {
 
     auto task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
 
+    // Create the z-buffer
+    auto z_buffer_id = create_z_buffer(device, swapchain);
+
+    auto task_z_buffer = daxa::TaskImage({
+        .initial_images = {.images = std::span{&z_buffer_id, 1}},
+        .name = "task depth image",
+    });
+
     auto task_uniform_buffer = daxa::TaskBuffer({
         .initial_buffers = {.buffers = std::span{&uniform_buffer_id, 1}},
         .name = "task uniform buffer",
@@ -242,8 +284,9 @@ int main(int argc, char const* argv[]) {
     loop_task_graph.use_persistent_buffer(task_vertex_buffer);
     loop_task_graph.use_persistent_buffer(task_index_buffer);
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
+    loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
-    draw_mesh_task(loop_task_graph, pipeline, task_vertex_buffer, task_index_buffer, task_uniform_buffer, task_swapchain_image);
+    draw_mesh_task(loop_task_graph, pipeline, task_vertex_buffer, task_index_buffer, task_z_buffer, task_uniform_buffer, task_swapchain_image);
 
     loop_task_graph.submit({});
     // And tell the task graph to do the present step.
@@ -267,7 +310,7 @@ int main(int argc, char const* argv[]) {
         auto upload_task_graph = daxa::TaskGraph({
             .device = device,
             .name = "upload",
-            });
+        });
 
         upload_task_graph.use_persistent_buffer(task_vertex_buffer);
         upload_task_graph.use_persistent_buffer(task_index_buffer);
@@ -288,10 +331,19 @@ int main(int argc, char const* argv[]) {
         if (window.swapchain_out_of_date) {
             swapchain.resize();
             window.swapchain_out_of_date = false;
+
+            // Recreate our buffers
+            device.destroy_image(z_buffer_id);
+            z_buffer_id = create_z_buffer(device, swapchain);
+            task_z_buffer.set_images({ .images = std::span{&z_buffer_id, 1} });
         }
 
+        float time = static_cast<float>(glfwGetTime());
+        float aspect_ratio = static_cast<float>(window.width) / window.height;
+        update_uniform_buffer(device, uniform_buffer_id, time, aspect_ratio);
+
         auto swapchain_image = swapchain.acquire_next_image();
-        if (swapchain_image.is_empty()) {
+        if (swapchain_image.is_empty()) {   
             continue;
         }
 
@@ -301,6 +353,7 @@ int main(int argc, char const* argv[]) {
         device.collect_garbage();
     }
 
+    device.destroy_image(z_buffer_id);
     device.destroy_buffer(uniform_buffer_id);
     device.destroy_buffer(vertex_buffer_id);
     device.destroy_buffer(index_buffer_id);
