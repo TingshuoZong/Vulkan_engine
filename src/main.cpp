@@ -11,38 +11,19 @@
 
 #include <iostream>
 
-void upload_mesh_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, daxa::TaskBufferView indices) {
+template<size_t VertexCount, size_t IndexCount>
+void upload_mesh_data_task(
+    daxa::TaskGraph& tg,
+    Drawable& drawableMesh,
+    const std::array<MyVertex, VertexCount>& vertex_data,
+    const std::array<uint32_t, IndexCount>& index_data
+) {
     tg.add_task({
         .attachments = {
-            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, vertices),
-            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, indices),
+            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, drawableMesh.task_vertex_buffer),
+            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, drawableMesh.task_index_buffer),
         },
         .task = [=](daxa::TaskInterface ti) {
-            auto vertex_data = std::array<MyVertex, 8>{
-                MyVertex{.position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0}},
-                MyVertex{.position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0}},
-                MyVertex{.position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1}},
-                MyVertex{.position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0}},
-                MyVertex{.position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1}},
-                MyVertex{.position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1}},
-                MyVertex{.position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1}},
-                MyVertex{.position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0}}
-            };
-            auto index_data = std::array<uint32_t, 36>{ 
-                // front face
-                0, 2, 1,  2, 0, 3,
-                // right face
-                1, 6, 5,  6, 1, 2,
-                // back face
-                5, 7, 4,  7, 5, 6,
-                // left face
-                4, 3, 0,  3, 4, 7,
-                // top face
-                3, 6, 2,  6, 3, 7,
-                // bottom face
-                4, 1, 5,  1, 4, 0,
-            };
-
             auto vertex_staging = ti.device.create_buffer({
                            .size = sizeof(vertex_data),
                            .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
@@ -53,7 +34,7 @@ void upload_mesh_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, d
             *vertex_ptr = vertex_data;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = vertex_staging,
-                .dst_buffer = ti.get(vertices).ids[0],
+                .dst_buffer = ti.get(drawableMesh.task_vertex_buffer).ids[0],
                 .size = sizeof(vertex_data),
             });
 
@@ -67,7 +48,7 @@ void upload_mesh_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, d
             *index_ptr = index_data;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = index_staging,
-                .dst_buffer = ti.get(indices).ids[0],
+                .dst_buffer = ti.get(drawableMesh.task_index_buffer).ids[0],
                 .size = sizeof(index_data),
             });
         },
@@ -102,10 +83,11 @@ void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView unifor
 void draw_mesh_task(
     daxa::TaskGraph& tg,
     std::shared_ptr<daxa::RasterPipeline> pipeline,
-    Drawable drawableMesh,
+    Drawable& drawableMesh,
     daxa::TaskImageView z_buffer,
     daxa::TaskBufferView uniform_buffer,
-    daxa::TaskImageView render_target) {
+    daxa::TaskImageView render_target
+) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawableMesh.task_vertex_buffer),
@@ -285,10 +267,9 @@ int main(int argc, char const* argv[]) {
         .name = "loop",
     });
 
-    loop_task_graph.use_persistent_buffer(cube.task_vertex_buffer); // TODO: maybe implement
-    loop_task_graph.use_persistent_buffer(cube.task_index_buffer);
+    cube.use_in_loop_task_graph(loop_task_graph);
+
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
-    loop_task_graph.use_persistent_buffer(cube.task_instance_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
     draw_mesh_task(loop_task_graph, pipeline, cube, task_z_buffer, task_uniform_buffer, task_swapchain_image);
@@ -316,11 +297,35 @@ int main(int argc, char const* argv[]) {
             .name = "upload",
         });
 
-        upload_task_graph.use_persistent_buffer(cube.task_vertex_buffer);
-        upload_task_graph.use_persistent_buffer(cube.task_index_buffer);
+        cube.use_in_upload_task_graph(upload_task_graph);
+
         upload_task_graph.use_persistent_buffer(task_uniform_buffer);
 
-        upload_mesh_data_task(upload_task_graph, cube.task_vertex_buffer, cube.task_index_buffer);
+        upload_mesh_data_task<8, 36>(upload_task_graph, cube,
+            std::array<MyVertex, 8>{
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
+                MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
+                MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
+                MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
+                MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
+                MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
+                MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
+                MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+            },
+            std::array<uint32_t, 36>{
+                // front face
+                0, 2, 1, 2, 0, 3,
+                // right face
+                1, 6, 5, 6, 1, 2,
+                // back face
+                5, 7, 4, 7, 5, 6,
+                // left face
+                4, 3, 0, 3, 4, 7,
+                // top face
+                3, 6, 2, 6, 3, 7,
+                // bottom face
+                4, 1, 5, 1, 4, 0,
+        });
         upload_uniform_buffer_task(upload_task_graph, task_uniform_buffer, ubo);
 
         upload_task_graph.submit({});
@@ -391,11 +396,10 @@ int main(int argc, char const* argv[]) {
         device.collect_garbage();
     }
 
+    cube.cleanup();
+
     device.destroy_image(z_buffer_id);
-    device.destroy_buffer(cube.instance_buffer_id);
     device.destroy_buffer(uniform_buffer_id);
-    device.destroy_buffer(cube.vertex_buffer_id);
-    device.destroy_buffer(cube.index_buffer_id);
 
 
     device.wait_idle();
