@@ -1,6 +1,9 @@
 #include "window.h"
 #include "shared.inl"
 
+#include "Core/Camera.h"
+#include "Core/InputSystem.h"
+
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
@@ -150,16 +153,11 @@ void draw_mesh_task(
     });
 }
 
-void update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_id, float time, float aspect_ratio) {
+void update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float time, float aspect_ratio) {
     UniformBufferObject ubo{};
     ubo.model = glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                           glm::vec3(0.0f, 0.0f, 0.0f),
-                           glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), aspect_ratio, 0.1f, 10.0f);
-
-    // Vulkan clip space Y is inverted, so invert proj matrix's Y here:
-    ubo.proj[1][1] *= -1;
+    ubo.view = ubo.view = camera.get_view_matrix();
+    ubo.proj = camera.get_projection(aspect_ratio);
 
     auto* ptr = device.buffer_host_address_as<UniformBufferObject>(uniform_buffer_id).value();
     *ptr = ubo;
@@ -303,7 +301,6 @@ int main(int argc, char const* argv[]) {
                              1600.0f / 900.0f,
                              0.1f, 10.0f),
     };
-    ubo.proj[1][1] *= -1;  // Vulkan clip space correction
 
     {
         auto upload_task_graph = daxa::TaskGraph({
@@ -323,9 +320,29 @@ int main(int argc, char const* argv[]) {
         upload_task_graph.execute({});
     }
 
+    Camera camera;
+    camera.update_vectors();
+
+    auto* glfw_window = window.get_glfw_window();
+    glfwSetWindowUserPointer(glfw_window, &camera);
+    glfwSetCursorPosCallback(glfw_window, InputSystem::mouse_callback);
+
+    // Capture the mouse cursor (optional)
+    window.set_mouse_capture(true);
+
+    float last_frame_time = static_cast<float>(glfwGetTime());
+
     // Main loop
     while (!window.should_close()) {
+        float current_time = static_cast<float>(glfwGetTime());
+        float delta_time = current_time - last_frame_time;
+        last_frame_time = current_time;
+
         window.update();
+
+        InputSystem::process_input(window.get_glfw_window(), camera, delta_time);
+
+        ubo.view = camera.get_view_matrix();
 
         if (window.swapchain_out_of_date) {
             swapchain.resize();
@@ -337,9 +354,8 @@ int main(int argc, char const* argv[]) {
             task_z_buffer.set_images({ .images = std::span{&z_buffer_id, 1} });
         }
 
-        float time = static_cast<float>(glfwGetTime());
         float aspect_ratio = static_cast<float>(window.width) / window.height;
-        update_uniform_buffer(device, uniform_buffer_id, time, aspect_ratio);
+        update_uniform_buffer(device, uniform_buffer_id, camera, current_time, aspect_ratio);
 
         auto swapchain_image = swapchain.acquire_next_image();
         if (swapchain_image.is_empty()) {   

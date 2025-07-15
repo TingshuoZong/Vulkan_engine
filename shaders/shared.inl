@@ -2,6 +2,7 @@
 
 #include <daxa/daxa.inl>
 
+
 #ifdef __cplusplus
 // CPU side only definitions
 #include <glm/glm.hpp>
