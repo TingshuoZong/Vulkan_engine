@@ -1,7 +1,9 @@
 #include "window.h"
 #include "shared.inl"
 
-#include "Core/Drawable.h"
+#include "Renderer/Drawable.h"
+#include "Renderer/DrawGroup.h"
+
 #include "Core/Camera.h"
 #include "Core/InputSystem.h"
 
@@ -83,20 +85,27 @@ void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView unifor
 void draw_mesh_task(
     daxa::TaskGraph& tg,
     std::shared_ptr<daxa::RasterPipeline> pipeline,
-    Drawable& drawableMesh,
+    std::vector<Drawable>& drawGroup,
     daxa::TaskImageView z_buffer,
     daxa::TaskBufferView uniform_buffer,
     daxa::TaskImageView render_target
 ) {
+    std::vector<daxa::TaskAttachmentInfo> attachments;
+
+    // Shared resources
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, uniform_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, render_target));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, z_buffer));
+
+    // Add each drawable's vertex/index/instance buffers
+    for (auto& drawable : drawGroup) {
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.task_vertex_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.task_instance_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.task_index_buffer));
+    }
+
     tg.add_task({
-        .attachments = {
-            daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawableMesh.task_vertex_buffer),
-            daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, uniform_buffer),
-            daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawableMesh.task_instance_buffer),
-            daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawableMesh.task_index_buffer),
-            daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, render_target),
-            daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, z_buffer),
-        },
+        .attachments = attachments,
         .task = [=](daxa::TaskInterface ti) {
             auto const size = ti.device.info(ti.get(render_target).ids[0]).value().size;
 
@@ -118,22 +127,24 @@ void draw_mesh_task(
 
             render_recorder.set_pipeline(*pipeline);
 
-            render_recorder.set_index_buffer({
-                .id = ti.get(drawableMesh.task_index_buffer).ids[0],
-                .offset = 0,
-                .index_type = daxa::IndexType::uint32,
-            });
+            for (auto const& drawableMesh : drawGroup) {
+                render_recorder.set_index_buffer({
+                    .id = ti.get(drawableMesh.task_index_buffer).ids[0],
+                    .offset = 0,
+                    .index_type = daxa::IndexType::uint32,
+                    });
 
-            render_recorder.push_constant(MyPushConstant{
-                .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.task_vertex_buffer).ids[0]).value(),
-                .ubo_ptr = ti.device.device_address(ti.get(uniform_buffer).ids[0]).value(),
-                .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.task_instance_buffer).ids[0]).value(),
-            });
+                render_recorder.push_constant(MyPushConstant{
+                    .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.task_vertex_buffer).ids[0]).value(),
+                    .ubo_ptr = ti.device.device_address(ti.get(uniform_buffer).ids[0]).value(),
+                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.task_instance_buffer).ids[0]).value(),
+                    });
 
-            render_recorder.draw_indexed({
-                .index_count = 36,
-                .instance_count = static_cast<uint32_t>(drawableMesh.instance_data.size()),
-            });
+                render_recorder.draw_indexed({
+                    .index_count = 36,
+                    .instance_count = static_cast<uint32_t>(drawableMesh.instance_data.size()),
+                    });
+            }
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",
@@ -237,42 +248,79 @@ int main(int argc, char const* argv[]) {
 
     auto task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
 
-    Drawable cube(device, 8, 36, "Cube");
-
-    int grid_size = 5;        // 5x5x5 grid of cubes
-    float spacing = 2.0f;     // distance between cubes
-
-    for (int x = 0; x < grid_size; ++x) {
-        for (int y = 0; y < grid_size; ++y) {
-            for (int z = 0; z < grid_size; ++z) {
-                glm::vec3 position = glm::vec3(
-                    (x - grid_size / 2) * spacing,
-                    (y - grid_size / 2) * spacing,
-                    (z - grid_size / 2) * spacing
-                );
-
-                PerInstanceData data;
-                data.model_matrix = glm::translate(glm::mat4(1.0f), position);
-                cube.instance_data.push_back(data);
-            }
-        }
-    }
-
-    auto* ptr = device.buffer_host_address_as<PerInstanceData>(cube.instance_buffer_id).value();
-    memcpy(ptr, cube.instance_data.data(), cube.instance_data.size() * sizeof(PerInstanceData));
-
     auto loop_task_graph = daxa::TaskGraph({
         .device = device,
         .swapchain = swapchain,
         .name = "loop",
     });
 
+    std::vector<Drawable> drawGroup;
+
+    Drawable cube(device, 8, 36, "Cube");
+    
+    int grid_size = 5;        // 5x5x5 grid of cubes
+    float spacing = 2.0f;     // distance between cubes
+
+    {
+
+        for (int x = 0; x < grid_size; ++x) {
+            for (int y = 0; y < grid_size; ++y) {
+                for (int z = 0; z < grid_size; ++z) {
+                    glm::vec3 position = glm::vec3(
+                        (x - grid_size / 2) * spacing,
+                        (y - grid_size / 2) * spacing,
+                        (z - grid_size / 2) * spacing
+                    );
+
+                    PerInstanceData data;
+                    data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                    cube.instance_data.push_back(data);
+                }
+            }
+        }
+
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(cube.instance_buffer_id).value();
+        memcpy(ptr, cube.instance_data.data(), cube.instance_data.size() * sizeof(PerInstanceData));
+
+    }
+
     cube.use_in_loop_task_graph(loop_task_graph);
+
+    drawGroup.push_back(cube);
+
+    Drawable otherCube(device, 8, 36, "Other cube");
+
+    {
+
+        for (int x = 0; x < grid_size; ++x) {
+            for (int y = 0; y < grid_size; ++y) {
+                for (int z = 0; z < grid_size; ++z) {
+                    glm::vec3 position = glm::vec3(
+                        (x - grid_size / 2) * spacing - 15.0f,
+                        (y - grid_size / 2) * spacing,
+                        (z - grid_size / 2) * spacing
+                    );
+
+                    PerInstanceData data;
+                    data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                    otherCube.instance_data.push_back(data);
+                }
+            }
+        }
+
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(otherCube.instance_buffer_id).value();
+        memcpy(ptr, otherCube.instance_data.data(), otherCube.instance_data.size() * sizeof(PerInstanceData));
+
+    }
+
+    otherCube.use_in_loop_task_graph(loop_task_graph);
+
+    drawGroup.push_back(otherCube);
 
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
-    draw_mesh_task(loop_task_graph, pipeline, cube, task_z_buffer, task_uniform_buffer, task_swapchain_image);
+    draw_mesh_task(loop_task_graph, pipeline, drawGroup, task_z_buffer, task_uniform_buffer, task_swapchain_image);
 
     loop_task_graph.submit({});
     // And tell the task graph to do the present step.
@@ -327,6 +375,48 @@ int main(int argc, char const* argv[]) {
                 4, 1, 5, 1, 4, 0,
         });
         upload_uniform_buffer_task(upload_task_graph, task_uniform_buffer, ubo);
+
+        upload_task_graph.submit({});
+        upload_task_graph.complete({});
+        upload_task_graph.execute({});
+    }
+
+    {
+        auto upload_task_graph = daxa::TaskGraph({
+            .device = device,
+            .name = "upload",
+            });
+
+        otherCube.use_in_upload_task_graph(upload_task_graph);
+
+        //upload_task_graph.use_persistent_buffer(task_uniform_buffer);
+
+        upload_mesh_data_task<8, 36>(upload_task_graph, otherCube,
+            std::array<MyVertex, 8>{
+                MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {0.5, 0, 0} },
+                MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 0.5, 0} },
+                MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 0.5} },
+                MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {0.5, 0.5, 0} },
+                MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {0.5, 0, 0.5} },
+                MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 0.5, 0.5} },
+                MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {0.5, 0.5, 0.5} },
+                MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+        },
+            std::array<uint32_t, 36>{
+                // front face
+                0, 2, 1, 2, 0, 3,
+                // right face
+                1, 6, 5, 6, 1, 2,
+                // back face
+                5, 7, 4, 7, 5, 6,
+                // left face
+                4, 3, 0, 3, 4, 7,
+                // top face
+                3, 6, 2, 6, 3, 7,
+                // bottom face
+                4, 1, 5, 1, 4, 0,
+        });
+        //upload_uniform_buffer_task(upload_task_graph, task_uniform_buffer, ubo);
 
         upload_task_graph.submit({});
         upload_task_graph.complete({});
@@ -388,6 +478,24 @@ int main(int argc, char const* argv[]) {
         auto* ptr = device.buffer_host_address_as<PerInstanceData>(cube.instance_buffer_id).value();
         std::memcpy(ptr, cube.instance_data.data(), cube.instance_data.size() * sizeof(PerInstanceData));
 
+        for (int x = 0; x < grid_size; ++x) {
+            for (int y = 0; y < grid_size; ++y) {
+                for (int z = 0; z < grid_size; ++z) {
+                    glm::vec3 position = glm::vec3(
+                        (x - grid_size / 2) * spacing - 15.0f,
+                        (y - grid_size / 2) * spacing,
+                        (z - grid_size / 2) * spacing
+                    );
+                    int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
+                    float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex);
+                    float angle = current_time * speed;
+                    otherCube.instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+                }
+            }
+        }
+        auto* other_ptr = device.buffer_host_address_as<PerInstanceData>(otherCube.instance_buffer_id).value();
+        std::memcpy(other_ptr, otherCube.instance_data.data(), otherCube.instance_data.size() * sizeof(PerInstanceData));
+
         auto swapchain_image = swapchain.acquire_next_image();
 
         task_swapchain_image.set_images({ .images = std::span{&swapchain_image, 1} });
@@ -397,6 +505,7 @@ int main(int argc, char const* argv[]) {
     }
 
     cube.cleanup();
+    otherCube.cleanup();
 
     device.destroy_image(z_buffer_id);
     device.destroy_buffer(uniform_buffer_id);
