@@ -61,15 +61,4 @@ struct Drawable {
         device->destroy_buffer(vertex_buffer_id);
         device->destroy_buffer(index_buffer_id);
     }
-
-    void use_in_loop_task_graph(daxa::TaskGraph& loop_task_graph) {
-        loop_task_graph.use_persistent_buffer(task_vertex_buffer);
-        loop_task_graph.use_persistent_buffer(task_index_buffer);
-        loop_task_graph.use_persistent_buffer(task_instance_buffer);
-    }
-
-    void use_in_upload_task_graph(daxa::TaskGraph& upload_task_graph) {
-        upload_task_graph.use_persistent_buffer(task_vertex_buffer);
-        upload_task_graph.use_persistent_buffer(task_index_buffer);
-    }
 };

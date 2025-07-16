@@ -59,7 +59,6 @@ namespace InputSystem {
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 			app->set_mouse_capture(true);
-            std::cout << "Attempting to capture mouse" << std::endl;
 		}
     }
 }

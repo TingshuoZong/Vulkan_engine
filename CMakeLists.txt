@@ -15,8 +15,12 @@ set(SHADERS_DST_DIR "${CMAKE_BINARY_DIR}/shaders")
 file(MAKE_DIRECTORY ${SHADERS_DST_DIR})
 
 # Copy all files from source to destination
-file(GLOB SHADER_FILES "${SHADERS_SRC_DIR}/*")
-#file(GLOB SHADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.*")
+file(GLOB SHADER_FILES
+    "${SHADERS_SRC_DIR}/*.inl"
+    "${SHADERS_SRC_DIR}/*.cpp"
+    "${SHADERS_SRC_DIR}/*.h"
+    "${SHADERS_SRC_DIR}/*.hpp"
+)
 
 foreach(SHADER_FILE ${SHADER_FILES})
     # This adds the files to the VS project but doesn¡¯t compile them

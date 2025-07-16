@@ -13,51 +13,6 @@
 
 #include <iostream>
 
-template<size_t VertexCount, size_t IndexCount>
-void upload_mesh_data_task(
-    daxa::TaskGraph& tg,
-    Drawable& drawableMesh,
-    const std::array<MyVertex, VertexCount>& vertex_data,
-    const std::array<uint32_t, IndexCount>& index_data
-) {
-    tg.add_task({
-        .attachments = {
-            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, drawableMesh.task_vertex_buffer),
-            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, drawableMesh.task_index_buffer),
-        },
-        .task = [=](daxa::TaskInterface ti) {
-            auto vertex_staging = ti.device.create_buffer({
-                           .size = sizeof(vertex_data),
-                           .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
-                           .name = "vertex staging buffer",
-            });
-            ti.recorder.destroy_buffer_deferred(vertex_staging);
-            auto* vertex_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, 8>>(vertex_staging).value();
-            *vertex_ptr = vertex_data;
-            ti.recorder.copy_buffer_to_buffer({
-                .src_buffer = vertex_staging,
-                .dst_buffer = ti.get(drawableMesh.task_vertex_buffer).ids[0],
-                .size = sizeof(vertex_data),
-            });
-
-            auto index_staging = ti.device.create_buffer({
-                .size = sizeof(index_data),
-                .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
-                .name = "index staging buffer",
-                });
-            ti.recorder.destroy_buffer_deferred(index_staging);
-            auto* index_ptr = ti.device.buffer_host_address_as<std::array<uint32_t, 36>>(index_staging).value();
-            *index_ptr = index_data;
-            ti.recorder.copy_buffer_to_buffer({
-                .src_buffer = index_staging,
-                .dst_buffer = ti.get(drawableMesh.task_index_buffer).ids[0],
-                .size = sizeof(index_data),
-            });
-        },
-        .name = "upload mesh data",
-    });
-}
-
 void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, UniformBufferObject ubo) {
     tg.add_task({
         .attachments = {
@@ -84,11 +39,11 @@ void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView unifor
 
 void draw_mesh_task(
     daxa::TaskGraph& tg,
-    std::shared_ptr<daxa::RasterPipeline> pipeline,
-    std::vector<Drawable>& drawGroup,
+    DrawGroup& drawGroup,
     daxa::TaskImageView z_buffer,
     daxa::TaskBufferView uniform_buffer,
-    daxa::TaskImageView render_target
+    daxa::TaskImageView render_target,
+    bool clear = false
 ) {
     std::vector<daxa::TaskAttachmentInfo> attachments;
 
@@ -98,7 +53,7 @@ void draw_mesh_task(
     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, z_buffer));
 
     // Add each drawable's vertex/index/instance buffers
-    for (auto& drawable : drawGroup) {
+    for (auto& drawable : drawGroup.meshes) {
         attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.task_vertex_buffer));
         attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.task_instance_buffer));
         attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.task_index_buffer));
@@ -113,21 +68,21 @@ void draw_mesh_task(
                 .color_attachments = std::array{
                     daxa::RenderAttachmentInfo{
                         .image_view = ti.get(render_target).view_ids[0],
-                        .load_op = daxa::AttachmentLoadOp::CLEAR,
+                        .load_op = clear ? daxa::AttachmentLoadOp::CLEAR : daxa::AttachmentLoadOp::LOAD,
                         .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
                     },
                 },
                 .depth_attachment = daxa::RenderAttachmentInfo{
                     .image_view = ti.get(z_buffer).view_ids[0],
-                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .load_op = clear ? daxa::AttachmentLoadOp::CLEAR : daxa::AttachmentLoadOp::LOAD,
                     .clear_value = daxa::DepthValue{1.0f, 0},
                 },
                 .render_area = {.width = size.x, .height = size.y},
             });
 
-            render_recorder.set_pipeline(*pipeline);
+            render_recorder.set_pipeline(*drawGroup.pipeline);
 
-            for (auto const& drawableMesh : drawGroup) {
+            for (auto const& drawableMesh : drawGroup.meshes) {
                 render_recorder.set_index_buffer({
                     .id = ti.get(drawableMesh.task_index_buffer).ids[0],
                     .offset = 0,
@@ -254,10 +209,105 @@ int main(int argc, char const* argv[]) {
         .name = "loop",
     });
 
-    std::vector<Drawable> drawGroup;
+    UniformBufferObject ubo{
+        .model = glm::mat4(1.0f),
+        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                            glm::vec3(0.0f, 0.0f, 0.0f),
+                            glm::vec3(0.0f, 0.0f, 1.0f)),
+        .proj = glm::perspective(glm::radians(45.0f),
+                                 1600.0f / 900.0f,
+                                 0.1f, 10.0f),
+    };
 
-    Drawable cube(device, 8, 36, "Cube");
-    
+    DrawGroup drawGroup2(device, pipeline, "My Other DrawGroup");
+    drawGroup2.add_mesh<8, 36>(
+        std::array<MyVertex, 8>{
+        MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+    },
+        std::array<uint32_t, 36>{
+            // front face
+            0, 2, 1, 2, 0, 3,
+            // right face
+            1, 6, 5, 6, 1, 2,
+            // back face
+            5, 7, 4, 7, 5, 6,
+            // left face
+            4, 3, 0, 3, 4, 7,
+            // top face
+            3, 6, 2, 6, 3, 7,
+            // bottom face
+            4, 1, 5, 1, 4, 0,
+    },
+        "Cube"
+    );
+    drawGroup2.use_in_loop_task_graph(0, loop_task_graph);
+
+    DrawGroup drawGroup(device, pipeline, "My DrawGroup");
+    drawGroup.add_mesh<8, 36>(
+        std::array<MyVertex, 8>{
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+    },
+        std::array<uint32_t, 36>{
+            // front face
+            0, 2, 1, 2, 0, 3,
+            // right face
+            1, 6, 5, 6, 1, 2,
+            // back face
+            5, 7, 4, 7, 5, 6,
+            // left face
+            4, 3, 0, 3, 4, 7,
+            // top face
+            3, 6, 2, 6, 3, 7,
+            // bottom face
+            4, 1, 5, 1, 4, 0,
+        },
+        "Cube"
+    );
+    drawGroup.use_in_loop_task_graph(0, loop_task_graph);
+
+    drawGroup.add_mesh<8, 36>(
+        std::array<MyVertex, 8>{
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+    },
+        std::array<uint32_t, 36>{
+            // front face
+            0, 2, 1, 2, 0, 3,
+            // right face
+            1, 6, 5, 6, 1, 2,
+            // back face
+            5, 7, 4, 7, 5, 6,
+            // left face
+            4, 3, 0, 3, 4, 7,
+            // top face
+            3, 6, 2, 6, 3, 7,
+            // bottom face
+            4, 1, 5, 1, 4, 0,
+    },
+        "Other cube"
+    );
+    drawGroup.use_in_loop_task_graph(1, loop_task_graph);
+
     int grid_size = 5;        // 5x5x5 grid of cubes
     float spacing = 2.0f;     // distance between cubes
 
@@ -274,21 +324,15 @@ int main(int argc, char const* argv[]) {
 
                     PerInstanceData data;
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
-                    cube.instance_data.push_back(data);
+                    drawGroup.meshes[0].instance_data.push_back(data);
                 }
             }
         }
 
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(cube.instance_buffer_id).value();
-        memcpy(ptr, cube.instance_data.data(), cube.instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].instance_buffer_id).value();
+        memcpy(ptr, drawGroup.meshes[0].instance_data.data(), drawGroup.meshes[0].instance_data.size() * sizeof(PerInstanceData));
 
     }
-
-    cube.use_in_loop_task_graph(loop_task_graph);
-
-    drawGroup.push_back(cube);
-
-    Drawable otherCube(device, 8, 36, "Other cube");
 
     {
 
@@ -303,24 +347,48 @@ int main(int argc, char const* argv[]) {
 
                     PerInstanceData data;
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
-                    otherCube.instance_data.push_back(data);
+                    drawGroup.meshes[1].instance_data.push_back(data);
                 }
             }
         }
 
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(otherCube.instance_buffer_id).value();
-        memcpy(ptr, otherCube.instance_data.data(), otherCube.instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[1].instance_buffer_id).value();
+        memcpy(ptr, drawGroup.meshes[1].instance_data.data(), drawGroup.meshes[1].instance_data.size() * sizeof(PerInstanceData));
 
     }
 
-    otherCube.use_in_loop_task_graph(loop_task_graph);
+    {
 
-    drawGroup.push_back(otherCube);
+        for (int x = 0; x < grid_size; ++x) {
+            for (int y = 0; y < grid_size; ++y) {
+                for (int z = 0; z < grid_size; ++z) {
+                    glm::vec3 position = glm::vec3(
+                        (x - grid_size / 2) * spacing,
+                        (y - grid_size / 2) * spacing,
+                        (z - grid_size / 2) * spacing - 15.0f
+                    );
+
+                    PerInstanceData data;
+                    data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                    drawGroup2.meshes[0].instance_data.push_back(data);
+                }
+            }
+        }
+
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup2.meshes[0].instance_buffer_id).value();
+        memcpy(ptr, drawGroup2.meshes[0].instance_data.data(), drawGroup2.meshes[0].instance_data.size() * sizeof(PerInstanceData));
+
+    }
+
+    //otherCube.use_in_loop_task_graph(loop_task_graph);
+
+    //drawGroup.push_back(otherCube);
 
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
-    draw_mesh_task(loop_task_graph, pipeline, drawGroup, task_z_buffer, task_uniform_buffer, task_swapchain_image);
+    draw_mesh_task(loop_task_graph, drawGroup2, task_z_buffer, task_uniform_buffer, task_swapchain_image, true);
+    draw_mesh_task(loop_task_graph, drawGroup, task_z_buffer, task_uniform_buffer, task_swapchain_image, false);
 
     loop_task_graph.submit({});
     // And tell the task graph to do the present step.
@@ -328,100 +396,6 @@ int main(int argc, char const* argv[]) {
     // Finally, we complete the task graph, which essentially compiles the
     // dependency graph between tasks, and inserts the most optimal synchronization!
     loop_task_graph.complete({});
-
-    UniformBufferObject ubo{
-    .model = glm::mat4(1.0f),
-    .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                        glm::vec3(0.0f, 0.0f, 0.0f),
-                        glm::vec3(0.0f, 0.0f, 1.0f)),
-    .proj = glm::perspective(glm::radians(45.0f),
-                             1600.0f / 900.0f,
-                             0.1f, 10.0f),
-    };
-
-    {
-        auto upload_task_graph = daxa::TaskGraph({
-            .device = device,
-            .name = "upload",
-        });
-
-        cube.use_in_upload_task_graph(upload_task_graph);
-
-        upload_task_graph.use_persistent_buffer(task_uniform_buffer);
-
-        upload_mesh_data_task<8, 36>(upload_task_graph, cube,
-            std::array<MyVertex, 8>{
-            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
-                MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
-                MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
-                MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
-                MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
-                MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
-                MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
-                MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
-            },
-            std::array<uint32_t, 36>{
-                // front face
-                0, 2, 1, 2, 0, 3,
-                // right face
-                1, 6, 5, 6, 1, 2,
-                // back face
-                5, 7, 4, 7, 5, 6,
-                // left face
-                4, 3, 0, 3, 4, 7,
-                // top face
-                3, 6, 2, 6, 3, 7,
-                // bottom face
-                4, 1, 5, 1, 4, 0,
-        });
-        upload_uniform_buffer_task(upload_task_graph, task_uniform_buffer, ubo);
-
-        upload_task_graph.submit({});
-        upload_task_graph.complete({});
-        upload_task_graph.execute({});
-    }
-
-    {
-        auto upload_task_graph = daxa::TaskGraph({
-            .device = device,
-            .name = "upload",
-            });
-
-        otherCube.use_in_upload_task_graph(upload_task_graph);
-
-        //upload_task_graph.use_persistent_buffer(task_uniform_buffer);
-
-        upload_mesh_data_task<8, 36>(upload_task_graph, otherCube,
-            std::array<MyVertex, 8>{
-                MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {0.5, 0, 0} },
-                MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 0.5, 0} },
-                MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 0.5} },
-                MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {0.5, 0.5, 0} },
-                MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {0.5, 0, 0.5} },
-                MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 0.5, 0.5} },
-                MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {0.5, 0.5, 0.5} },
-                MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
-        },
-            std::array<uint32_t, 36>{
-                // front face
-                0, 2, 1, 2, 0, 3,
-                // right face
-                1, 6, 5, 6, 1, 2,
-                // back face
-                5, 7, 4, 7, 5, 6,
-                // left face
-                4, 3, 0, 3, 4, 7,
-                // top face
-                3, 6, 2, 6, 3, 7,
-                // bottom face
-                4, 1, 5, 1, 4, 0,
-        });
-        //upload_uniform_buffer_task(upload_task_graph, task_uniform_buffer, ubo);
-
-        upload_task_graph.submit({});
-        upload_task_graph.complete({});
-        upload_task_graph.execute({});
-    }
 
     Camera camera;
     camera.update_vectors();
@@ -471,12 +445,12 @@ int main(int argc, char const* argv[]) {
                     int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
                     float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex); // Unique speed per instance
                     float angle = current_time * speed;
-                    cube.instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+                    drawGroup.meshes[0].instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
                 }
             }
         }
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(cube.instance_buffer_id).value();
-        std::memcpy(ptr, cube.instance_data.data(), cube.instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].instance_buffer_id).value();
+        std::memcpy(ptr, drawGroup.meshes[0].instance_data.data(), drawGroup.meshes[0].instance_data.size() * sizeof(PerInstanceData));
 
         for (int x = 0; x < grid_size; ++x) {
             for (int y = 0; y < grid_size; ++y) {
@@ -489,12 +463,12 @@ int main(int argc, char const* argv[]) {
                     int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
                     float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex);
                     float angle = current_time * speed;
-                    otherCube.instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+                    drawGroup.meshes[1].instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
                 }
             }
         }
-        auto* other_ptr = device.buffer_host_address_as<PerInstanceData>(otherCube.instance_buffer_id).value();
-        std::memcpy(other_ptr, otherCube.instance_data.data(), otherCube.instance_data.size() * sizeof(PerInstanceData));
+        auto* other_ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[1].instance_buffer_id).value();
+        std::memcpy(other_ptr, drawGroup.meshes[1].instance_data.data(), drawGroup.meshes[1].instance_data.size() * sizeof(PerInstanceData));
 
         auto swapchain_image = swapchain.acquire_next_image();
 
@@ -504,8 +478,8 @@ int main(int argc, char const* argv[]) {
         device.collect_garbage();
     }
 
-    cube.cleanup();
-    otherCube.cleanup();
+    drawGroup.cleanup();
+    drawGroup2.cleanup();
 
     device.destroy_image(z_buffer_id);
     device.destroy_buffer(uniform_buffer_id);
