@@ -1,4 +1,5 @@
 .build/*
+.vs/*
 vcpkg_installed/*
 lib/*
 out/*

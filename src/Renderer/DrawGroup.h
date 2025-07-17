@@ -81,7 +81,7 @@ void DrawGroup::upload_mesh_data_task(
                            .name = this->name + ">" + name + "vertex staging buffer",
             });
             ti.recorder.destroy_buffer_deferred(vertex_staging);
-            auto* vertex_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, 8>>(vertex_staging).value();
+            auto* vertex_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, VertexCount>>(vertex_staging).value();
             *vertex_ptr = vertex_data;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = vertex_staging,
@@ -95,7 +95,7 @@ void DrawGroup::upload_mesh_data_task(
                 .name = this->name + ">" + name + " index staging buffer",
                 });
             ti.recorder.destroy_buffer_deferred(index_staging);
-            auto* index_ptr = ti.device.buffer_host_address_as<std::array<uint32_t, 36>>(index_staging).value();
+            auto* index_ptr = ti.device.buffer_host_address_as<std::array<uint32_t, IndexCount>>(index_staging).value();
             *index_ptr = index_data;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = index_staging,

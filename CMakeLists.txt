@@ -23,7 +23,7 @@ file(GLOB SHADER_FILES
 )
 
 foreach(SHADER_FILE ${SHADER_FILES})
-    # This adds the files to the VS project but doesn¡¯t compile them
+    # This adds the files to the VS project but doesnï¿½ï¿½t compile them
     source_group("Shaders" FILES ${SHADER_FILE})
 endforeach()
 
@@ -65,6 +65,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/shaders
     ${PROJECT_SOURCE_DIR}/lib/glm
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/lib
     ${PROJECT_SOURCE_DIR}/src
 )
 

@@ -1,6 +1,3 @@
-#include <daxa/daxa.inl>
-
-// Enabled the extension GL_EXT_debug_printf
 #extension GL_EXT_debug_printf : enable
 
 #include <shared.inl>
@@ -9,17 +6,18 @@
 DAXA_DECL_PUSH_CONSTANT(MyPushConstant, push)
 
 
-layout(location = 0) out daxa_f32vec3 v_col;
+layout(location = 0) out daxa_f32vec2 v_uv;
+layout(location = 1) flat out int v_InstanceIndex;
 
 void main() {
     MyVertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
+    PerInstanceData instData = deref(push.instance_buffer_ptr[gl_InstanceIndex]);
     UniformBufferObject ubo = deref(push.ubo_ptr);
-    PerInstanceData pid = deref(push.instance_buffer_ptr[gl_InstanceIndex]);
 
-    vec4 world_pos = pid.model_matrix * vec4(vert.position, 1.0);
+    vec4 world_pos = instData.model_matrix * vec4(vert.position, 1.0);
     vec4 view_pos = ubo.view * world_pos;
     gl_Position = ubo.proj * view_pos;
 
-    // gl_Position = daxa_f32vec4(vert.position, 1);
-    v_col = vert.color;
+    v_uv = vert.uv;
+    v_InstanceIndex = gl_InstanceIndex;
 }

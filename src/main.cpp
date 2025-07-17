@@ -11,7 +11,12 @@
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include <iostream>
+
+#define TEXTURE_PATH "C:/dev/Engine_project/assets/textures/"
 
 void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, UniformBufferObject ubo) {
     tg.add_task({
@@ -87,18 +92,18 @@ void draw_mesh_task(
                     .id = ti.get(drawableMesh.task_index_buffer).ids[0],
                     .offset = 0,
                     .index_type = daxa::IndexType::uint32,
-                    });
+                });
 
                 render_recorder.push_constant(MyPushConstant{
                     .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.task_vertex_buffer).ids[0]).value(),
                     .ubo_ptr = ti.device.device_address(ti.get(uniform_buffer).ids[0]).value(),
                     .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.task_instance_buffer).ids[0]).value(),
-                    });
+                });
 
                 render_recorder.draw_indexed({
-                    .index_count = 36,
+                    .index_count = drawableMesh.index_count,
                     .instance_count = static_cast<uint32_t>(drawableMesh.instance_data.size()),
-                    });
+                });
             }
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
@@ -123,6 +128,116 @@ daxa::ImageId create_z_buffer(daxa::Device& device, daxa::Swapchain const& swapc
         .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
         .name = "z-buffer",
     });
+}
+
+// --------------------------------------- TODO: abstractify these ---------------------------------------
+struct TextureDataHandle {
+    int width;
+    int height;
+    int channels;
+    std::string name;
+
+    daxa::ImageId image;
+    daxa::TaskImage task_texture_image;
+    daxa::BufferId texture_staging_buffer;
+    daxa::TaskBuffer task_texture_staging;
+};
+
+TextureDataHandle stream_texture_from_memory(daxa::Device device, std::string fileName) {
+    int width, height, channels;
+    std::string path = "C:/dev/Engine_project/assets/textures/" + fileName;
+
+    stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
+    if (!pixels) { std::cerr << "stb_image failed\n"; }
+
+    uint32_t size_bytes = width * height * 4;
+
+    daxa::ImageId image = device.create_image({
+        .format = daxa::Format::R8G8B8A8_UNORM,
+        .size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+        .usage = daxa::ImageUsageFlagBits::TRANSFER_DST | daxa::ImageUsageFlagBits::SHADER_SAMPLED,
+        .name = fileName + " texture image"
+    });
+
+    daxa::TaskImage task_texture_image = daxa::TaskImage({
+        .initial_images = {.images = std::span{&image, 1}},
+        .name = fileName + " texutre task image"
+    });
+
+    daxa::BufferId texture_staging_buffer = device.create_buffer({
+        .size = size_bytes,
+        .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_SEQUENTIAL_WRITE,
+        .name = fileName + " texture staging buffer"
+    });
+
+    daxa::TaskBuffer task_texture_staging = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&texture_staging_buffer, 1} },
+        .name = fileName + " staging task buffer"
+    });
+
+    {
+        auto* ptr = device.buffer_host_address_as<std::byte>(task_texture_staging.get_state().buffers[0]).value();
+        std::memcpy(ptr, pixels, size_bytes);
+    }
+    stbi_image_free(pixels);
+
+    return {
+		.width = width, .height = height, .channels = channels,
+        .name = fileName,
+        .image = image,
+        .task_texture_image = task_texture_image,
+        .texture_staging_buffer = texture_staging_buffer,
+        .task_texture_staging = task_texture_staging
+    };
+}
+
+daxa::ImageViewId load_texture(daxa::TaskGraph loop_task_graph, TextureDataHandle textureData) {
+    loop_task_graph.use_persistent_buffer(textureData.task_texture_staging);
+    loop_task_graph.use_persistent_image(textureData.task_texture_image);
+
+    loop_task_graph.add_task({
+        .attachments = {
+            daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_READ, textureData.task_texture_staging.view()),
+            daxa::inl_attachment(daxa::TaskImageAccess::TRANSFER_WRITE, textureData.task_texture_image.view())
+        },
+        .task = [=](daxa::TaskInterface ti) {
+            ti.recorder.pipeline_barrier_image_transition({
+                .src_access = daxa::AccessConsts::NONE,
+                .dst_access = daxa::AccessConsts::TRANSFER_WRITE,
+                .src_layout = daxa::ImageLayout::UNDEFINED,
+                .dst_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+                .image_slice = {
+                    .base_mip_level = 0,
+                    .level_count = 1,
+                    .base_array_layer = 0,
+                    .layer_count = 1
+                },
+                .image_id = ti.get(textureData.task_texture_image).ids[0],
+            }),
+            ti.recorder.copy_buffer_to_image({
+                .buffer = ti.get(textureData.task_texture_staging).ids[0],
+                .image = ti.get(textureData.task_texture_image).ids[0],
+                .image_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+                .image_extent = {static_cast<uint32_t>(textureData.width), static_cast<uint32_t>(textureData.height), 1}
+            }),
+            ti.recorder.pipeline_barrier_image_transition({
+                .src_access = daxa::AccessConsts::TRANSFER_WRITE,
+                .dst_access = daxa::AccessConsts::FRAGMENT_SHADER_READ,
+                .src_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+                .dst_layout = daxa::ImageLayout::READ_ONLY_OPTIMAL,
+                .image_slice = {
+                    .base_mip_level = 0,
+                    .level_count = 1,
+                    .base_array_layer = 0,
+                    .layer_count = 1
+                },
+                .image_id = ti.get(textureData.task_texture_image).ids[0],
+            });
+        },
+        .name = textureData.name + " upload"
+        });
+
+    return textureData.image.default_view();
 }
 
 int main(int argc, char const* argv[]) {
@@ -158,8 +273,8 @@ int main(int argc, char const* argv[]) {
     std::shared_ptr<daxa::RasterPipeline> pipeline;
     {
         auto result = pipeline_manager.add_raster_pipeline2({
-            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.vert.glsl"}},
-            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.frag.glsl"}},
+            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.vert.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.frag.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
             .color_attachments = {{.format = swapchain.get_format()}},
             .depth_test = daxa::DepthTestInfo{
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,
@@ -209,6 +324,26 @@ int main(int argc, char const* argv[]) {
         .name = "loop",
     });
 
+    // ------------------------------------------------------------------------
+
+    TextureDataHandle texture1 = stream_texture_from_memory(device, "test_texture.jpg");
+
+    daxa::ImageViewId view1 = load_texture(loop_task_graph, texture1);
+
+    TextureDataHandle texture2 = stream_texture_from_memory(device, "test_texture2.jpg");
+
+    daxa::ImageViewId view2 = load_texture(loop_task_graph, texture2);
+
+    daxa::SamplerId sampler = device.create_sampler({
+        .magnification_filter = daxa::Filter::LINEAR,
+		.minification_filter = daxa::Filter::LINEAR,
+        .mipmap_filter = daxa::Filter::LINEAR,
+        .address_mode_u = daxa::SamplerAddressMode::REPEAT,
+        .address_mode_v = daxa::SamplerAddressMode::REPEAT,
+    });
+
+   // ------------------------------------------------------------------------
+
     UniformBufferObject ubo{
         .model = glm::mat4(1.0f),
         .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
@@ -222,14 +357,14 @@ int main(int argc, char const* argv[]) {
     DrawGroup drawGroup2(device, pipeline, "My Other DrawGroup");
     drawGroup2.add_mesh<8, 36>(
         std::array<MyVertex, 8>{
-        MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
-            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
-            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
-            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
-            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
-            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0, 1} },
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0, 1} },
     },
         std::array<uint32_t, 36>{
             // front face
@@ -252,14 +387,14 @@ int main(int argc, char const* argv[]) {
     DrawGroup drawGroup(device, pipeline, "My DrawGroup");
     drawGroup.add_mesh<8, 36>(
         std::array<MyVertex, 8>{
-            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
-            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
-            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
-            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
-            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
-            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0, 1} },
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0, 1} },
     },
         std::array<uint32_t, 36>{
             // front face
@@ -279,30 +414,57 @@ int main(int argc, char const* argv[]) {
     );
     drawGroup.use_in_loop_task_graph(0, loop_task_graph);
 
-    drawGroup.add_mesh<8, 36>(
-        std::array<MyVertex, 8>{
-            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .color = {1, 0, 0} },
-            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .color = {0, 1, 0} },
-            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .color = {0, 0, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .color = {1, 1, 0} },
-            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .color = {1, 0, 1} },
-            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .color = {0, 1, 1} },
-            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .color = {1, 1, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .color = {0, 0, 0} }
+    drawGroup.add_mesh<24, 36>(
+        std::array<MyVertex, 24>{
+            // Front face (Z+)
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 0
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1.0f, 0.0f} },   // 1
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1.0f, 1.0f} },   // 2
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0.0f, 1.0f} },   // 3
+
+            // Back face (Z-)
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {0.0f, 0.0f} },   // 4
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {1.0f, 0.0f} },   // 5
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {1.0f, 1.0f} },   // 6
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {0.0f, 1.0f} },   // 7
+
+            // Left face (X-)
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0.0f, 0.0f} },   // 8
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {1.0f, 0.0f} },   // 9
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {1.0f, 1.0f} },   // 10
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0.0f, 1.0f} },   // 11
+
+            // Right face (X+)
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 12
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1.0f, 0.0f} },   // 13
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1.0f, 1.0f} },   // 14
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {0.0f, 1.0f} },   // 15
+
+            // Top face (Y+)
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 16rz
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1.0f, 0.0f} },   // 17
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1.0f, 1.0f} },   // 18
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0.0f, 1.0f} },   // 19
+
+            // Bottom face (Y-)
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0.0f, 0.0f} },   // 20
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1.0f, 0.0f} },   // 21
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1.0f, 1.0f} },   // 22
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0.0f, 1.0f} },   // 23
     },
         std::array<uint32_t, 36>{
-            // front face
-            0, 2, 1, 2, 0, 3,
-            // right face
-            1, 6, 5, 6, 1, 2,
-            // back face
-            5, 7, 4, 7, 5, 6,
-            // left face
-            4, 3, 0, 3, 4, 7,
-            // top face
-            3, 6, 2, 6, 3, 7,
-            // bottom face
-            4, 1, 5, 1, 4, 0,
+            // Front face
+            0, 1, 2, 0, 2, 3,
+            // Back face
+            4, 5, 6, 4, 6, 7,
+            // Left face
+            8, 9, 10, 8, 10, 11,
+            // Right face
+            12, 13, 14, 12, 14, 15,
+            // Top face
+            16, 17, 18, 16, 18, 19,
+            // Bottom face
+            20, 21, 22, 20, 22, 23,
     },
         "Other cube"
     );
@@ -324,6 +486,8 @@ int main(int argc, char const* argv[]) {
 
                     PerInstanceData data;
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                    data.texture = view1;
+                    data.tex_sampler = sampler;
                     drawGroup.meshes[0].instance_data.push_back(data);
                 }
             }
@@ -347,6 +511,8 @@ int main(int argc, char const* argv[]) {
 
                     PerInstanceData data;
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                    //data.texture = view2;
+					data.tex_sampler = sampler;
                     drawGroup.meshes[1].instance_data.push_back(data);
                 }
             }
@@ -370,6 +536,8 @@ int main(int argc, char const* argv[]) {
 
                     PerInstanceData data;
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
+                    data.texture = view1;
+                    data.tex_sampler = sampler;
                     drawGroup2.meshes[0].instance_data.push_back(data);
                 }
             }
@@ -477,6 +645,13 @@ int main(int argc, char const* argv[]) {
         loop_task_graph.execute({});
         device.collect_garbage();
     }
+
+    device.destroy_image(texture1.image);
+    device.destroy_buffer(texture1.texture_staging_buffer);
+    device.destroy_image(texture2.image);
+    device.destroy_buffer(texture2.texture_staging_buffer);
+
+    device.destroy_sampler(sampler);
 
     drawGroup.cleanup();
     drawGroup2.cleanup();
