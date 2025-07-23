@@ -3,7 +3,7 @@
 #include "window.h"
 #include "shared.inl"
 
-#include "Renderer/Drawable.h"
+#include "Renderer/DrawableMesh.h"
 #include "Renderer/DrawGroup.h"
 #include "Renderer/TextureHandle.h"
 #include "Renderer/Renderer.h"

@@ -3,18 +3,17 @@
 #include "window.h"
 #include "shared.inl"
 
-#include "Renderer/Drawable.h"
+#undef Drawable
+// #include "Renderer/Drawable.h"
 #include "Renderer/DrawGroup.h"
-#include "Renderer/TextureHandle.h"
+// #include "Renderer/TextureHandle.h"
 
 #include "Core/Camera.h"
-#include "Core/InputSystem.h"
+// #include "Core/InputSystem.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
-
-#include <iostream>
 
 constexpr const char* GLOBAL_SHADER_PATH = "C:/dev/Engine_project/shaders";
 constexpr float V_FOV = 60.0f;
@@ -40,16 +39,16 @@ struct Renderer {
 
     Renderer(AppWindow& window, daxa::Device& device, daxa::Instance& instance);
 
-    void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, UniformBufferObject ubo);
+    static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo);
 
-    void draw_mesh_task(DrawGroup& drawGroup, bool clear = false);
+    void draw_mesh_task(const DrawGroup& drawGroup, bool clear = false);
 
-    void update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
+    static void update_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
 
     void init();
     void submit_task_graph();
     void cleanup();
 
-    void startFrame(Camera& camera);
+    void startFrame(const Camera& camera);
     void endFrame();
 };

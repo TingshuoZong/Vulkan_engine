@@ -1,7 +1,7 @@
 #pragma once
 
 #include "shared.inl"
-#include "Drawable.h"
+#include "DrawableMesh.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -9,12 +9,12 @@
 
 struct DrawGroup {
 	std::string name;
-	std::vector<Drawable> meshes;
+	std::vector<DrawableMesh> meshes;
 	std::shared_ptr<daxa::RasterPipeline> pipeline;
 
 	daxa::Device& device;
 
-	DrawGroup(daxa::Device& device, std::shared_ptr<daxa::RasterPipeline> pipeline, std::string name);
+	DrawGroup(daxa::Device& device, const std::shared_ptr<daxa::RasterPipeline> &pipeline, std::string name);
 	void cleanup();
 
 	template<size_t VertexCount, size_t IndexCount>
@@ -34,7 +34,7 @@ private:
 	template<size_t VertexCount, size_t IndexCount>
 	void upload_mesh_data_task(
 		daxa::TaskGraph& tg,
-		Drawable& drawableMesh,
+		DrawableMesh& drawableMesh,
 		const std::array<MyVertex, VertexCount>& vertex_data,
 		const std::array<uint32_t, IndexCount>& index_data
 	);
@@ -43,7 +43,7 @@ private:
 
 template<size_t VertexCount, size_t IndexCount>
 void DrawGroup::add_mesh(const std::array<MyVertex, VertexCount>& vertex_data, const std::array<uint32_t, IndexCount>& index_data, std::string name) {
-	Drawable drawableMesh(device, VertexCount, IndexCount, this->name + ">" + name);
+	DrawableMesh drawableMesh(device, VertexCount, IndexCount, this->name + ">" + name);
 
 	auto upload_task_graph = daxa::TaskGraph({
 		.device = device,
@@ -65,7 +65,7 @@ void DrawGroup::add_mesh(const std::array<MyVertex, VertexCount>& vertex_data, c
 template<size_t VertexCount, size_t IndexCount>
 void DrawGroup::upload_mesh_data_task(
     daxa::TaskGraph& tg,
-    Drawable& drawableMesh,
+    DrawableMesh& drawableMesh,
     const std::array<MyVertex, VertexCount>& vertex_data,
     const std::array<uint32_t, IndexCount>& index_data
 ) {

@@ -1,5 +1,9 @@
 .build/*
+.build-clangd-linux/*
 .vs/*
+.idea/*
 vcpkg_installed/*
 lib/*
 out/*
+compile_commands.json
+CMakePresets.json

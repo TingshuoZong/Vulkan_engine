@@ -9,12 +9,12 @@ UniformBufferObject ubo{
         .proj = glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f),
 };
 
-void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, UniformBufferObject ubo) {
+void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, uniform_buffer)
         },
-        .task = [=](daxa::TaskInterface ti) {
+        .task = [=](const daxa::TaskInterface &ti) {
             auto uniform_staging = ti.device.create_buffer({
                            .size = sizeof(UniformBufferObject),
                            .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
@@ -34,8 +34,8 @@ void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferV
 }
 
 void Renderer::draw_mesh_task(
-    DrawGroup& drawGroup,
-    bool clear
+    const DrawGroup& drawGroup,
+    const bool clear
 ) {
     std::vector<daxa::TaskAttachmentInfo> attachments;
 
@@ -53,7 +53,7 @@ void Renderer::draw_mesh_task(
 
     loop_task_graph.add_task({
         .attachments = attachments,
-        .task = [=](daxa::TaskInterface ti) {
+        .task = [=](const daxa::TaskInterface &ti) {
             auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
 
             daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
@@ -95,10 +95,10 @@ void Renderer::draw_mesh_task(
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",
-        });
+    });
 }
 
-void Renderer::update_uniform_buffer(daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
+void Renderer::update_uniform_buffer(const daxa::Device& device, const daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
     UniformBufferObject ubo{};
     ubo.view = camera.get_view_matrix();
     ubo.proj = camera.get_projection(aspect_ratio);
@@ -158,6 +158,8 @@ void Renderer::init() {
 
     task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
 
+
+
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
@@ -187,7 +189,7 @@ void Renderer::cleanup() {
     device.destroy_buffer(uniform_buffer_id);
 }
 
-void Renderer::startFrame(Camera& camera) {
+void Renderer::startFrame(const Camera& camera) {
     if (window.swapchain_out_of_date) {
         swapchain.resize();
         window.swapchain_out_of_date = false;

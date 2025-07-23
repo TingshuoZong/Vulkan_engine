@@ -5,9 +5,10 @@
 #include <daxa/daxa.hpp>
 #include <daxa/utils/task_graph.hpp>
 
+
 constexpr size_t MAX_INSTANCE_COUNT = 1024;
 
-struct Drawable {
+struct DrawableMesh {
     daxa::Device* device = nullptr;
 
     daxa::BufferId vertex_buffer_id;
@@ -24,7 +25,7 @@ struct Drawable {
 
     std::string name;
 
-    Drawable(daxa::Device& device, uint32_t vertex_count, uint32_t index_count, std::string name)
+    DrawableMesh(daxa::Device& device, uint32_t vertex_count, uint32_t index_count, std::string name)
         : device(&device), vertex_count(vertex_count), index_count(index_count), name(name) {
 
         vertex_buffer_id = device.create_buffer({
@@ -52,7 +53,7 @@ struct Drawable {
         });
         task_instance_buffer = daxa::TaskBuffer({
             .initial_buffers = {.buffers = std::span{&instance_buffer_id, 1} },
-            .name = name + " instance buffer"
+            .name = name + " task instance SSBO"
         });
     }
 

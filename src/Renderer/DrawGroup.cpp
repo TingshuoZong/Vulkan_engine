@@ -1,6 +1,6 @@
 #include "DrawGroup.h"
 
-DrawGroup::DrawGroup(daxa::Device& device, std::shared_ptr<daxa::RasterPipeline> pipeline, std::string name)
+DrawGroup::DrawGroup(daxa::Device& device, const std::shared_ptr<daxa::RasterPipeline> &pipeline, std::string name)
 	: device(device), pipeline(pipeline), name(name) {
 
 }
