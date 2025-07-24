@@ -46,9 +46,9 @@ void Renderer::draw_mesh_task(
 
     // Add each drawable's vertex/index/instance buffers
     for (auto& drawable : drawGroup.meshes) {
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.task_vertex_buffer));
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.task_instance_buffer));
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.task_index_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_vertex_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_instance_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.lock()->task_index_buffer));
     }
 
     loop_task_graph.add_task({
@@ -76,20 +76,20 @@ void Renderer::draw_mesh_task(
 
             for (auto const& drawableMesh : drawGroup.meshes) {
                 render_recorder.set_index_buffer({
-                    .id = ti.get(drawableMesh.task_index_buffer).ids[0],
+                    .id = ti.get(drawableMesh.lock()->task_index_buffer).ids[0],
                     .offset = 0,
                     .index_type = daxa::IndexType::uint32,
                 });
 
                 render_recorder.push_constant(MyPushConstant{
-                    .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.task_vertex_buffer).ids[0]).value(),
+                    .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_vertex_buffer).ids[0]).value(),
                     .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
-                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.task_instance_buffer).ids[0]).value(),
+                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_instance_buffer).ids[0]).value(),
                 });
 
                 render_recorder.draw_indexed({
-                    .index_count = drawableMesh.index_count,
-                    .instance_count = static_cast<uint32_t>(drawableMesh.instance_data.size()),
+                    .index_count = drawableMesh.lock()->index_count,
+                    .instance_count = static_cast<uint32_t>(drawableMesh.lock()->instance_data.size()),
                 });
             }
             ti.recorder = std::move(render_recorder).end_renderpass();

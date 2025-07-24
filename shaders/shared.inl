@@ -33,7 +33,7 @@
     };
 
     struct PerInstanceData {
-        mat4 model_matrix;
+        daxa_f32mat4x4 model_matrix;
         daxa_ImageViewId texture;
         daxa_SamplerId tex_sampler;
         daxa_u32 _pad0;

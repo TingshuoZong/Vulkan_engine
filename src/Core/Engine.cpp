@@ -7,6 +7,7 @@
 #include "Renderer/DrawGroup.h"
 #include "Renderer/TextureHandle.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/MeshManager.h"
 
 #include "Core/Camera.h"
 #include "Core/InputSystem.h"
@@ -59,7 +60,6 @@ int init() {
         }
         pipeline = result.value();
     }
-    // ----------------------------- Keep ------------------------------ //
     TextureHandle texture1 = TextureHandle(device, "test_texture.jpg");
     texture1.stream_texture_from_memory();
 
@@ -69,7 +69,6 @@ int init() {
     texture2.stream_texture_from_memory();
 
     daxa::ImageViewId view2 = texture2.load_texture(renderer.loop_task_graph);
-    // ----------------------------------------------------------------- //
 
     daxa::SamplerId sampler = device.create_sampler({
         .magnification_filter = daxa::Filter::LINEAR,
@@ -78,42 +77,16 @@ int init() {
         .address_mode_u = daxa::SamplerAddressMode::REPEAT,
         .address_mode_v = daxa::SamplerAddressMode::REPEAT,
         });
-
-    // ------------------------------ Keep ------------------------------ //
-    DrawGroup drawGroup2(device, pipeline, "My Other DrawGroup");
-    drawGroup2.add_mesh<8, 36>(
-        std::array<MyVertex, 8>{
-        MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0, 0} },
-            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1, 0} },
-            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0, 1} },
-            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0, 0} },
-            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1, 0} },
-            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1, 1} },
-            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0, 1} },
-    },
-        std::array<uint32_t, 36>{
-        // front face
-        0, 2, 1, 2, 0, 3,
-            // right face
-            1, 6, 5, 6, 1, 2,
-            // back face
-            5, 7, 4, 7, 5, 6,
-            // left face
-            4, 3, 0, 3, 4, 7,
-            // top face
-            3, 6, 2, 6, 3, 7,
-            // bottom face
-            4, 1, 5, 1, 4, 0,
-    },
-        "Cube"
-    );
-    drawGroup2.use_in_loop_task_graph(0, renderer.loop_task_graph);
-
+// -----------------------------------------------------------------------------------------------------------------
+    MeshManager meshManager(device);
     DrawGroup drawGroup(device, pipeline, "My DrawGroup");
-    drawGroup.add_mesh<8, 36>(
+    DrawGroup drawGroup2(device, pipeline, "My Other DrawGroup");
+
+    meshManager.add_mesh<8, 36>("Cube");
+
+    drawGroup2.register_mesh(meshManager.get_mesh_ptr(0), renderer.loop_task_graph,
         std::array<MyVertex, 8>{
-        MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0, 0} },
             MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1, 0} },
             MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1, 1} },
             MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0, 1} },
@@ -121,10 +94,10 @@ int init() {
             MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1, 0} },
             MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1, 1} },
             MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0, 1} },
-    },
+        },
         std::array<uint32_t, 36>{
-        // front face
-        0, 2, 1, 2, 0, 3,
+            // front face
+            0, 2, 1, 2, 0, 3,
             // right face
             1, 6, 5, 6, 1, 2,
             // back face
@@ -135,15 +108,14 @@ int init() {
             3, 6, 2, 6, 3, 7,
             // bottom face
             4, 1, 5, 1, 4, 0,
-    },
-        "Cube"
+        }
     );
-    drawGroup.use_in_loop_task_graph(0, renderer.loop_task_graph);
 
-    drawGroup.add_mesh<24, 36>(
+    meshManager.add_mesh<24, 366>("Cube 2");
+    drawGroup2.register_mesh(meshManager.get_mesh_ptr(1), renderer.loop_task_graph,
         std::array<MyVertex, 24>{
-        // Front face (Z+)
-        MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 0
+            // Front face (Z+)
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 0
             MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1.0f, 0.0f} },   // 1
             MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1.0f, 1.0f} },   // 2
             MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0.0f, 1.0f} },   // 3
@@ -167,7 +139,7 @@ int init() {
             MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {0.0f, 1.0f} },   // 15
 
             // Top face (Y+)
-            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 16rz
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0.0f, 0.0f} },   // 16
             MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1.0f, 0.0f} },   // 17
             MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1.0f, 1.0f} },   // 18
             MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0.0f, 1.0f} },   // 19
@@ -177,10 +149,10 @@ int init() {
             MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1.0f, 0.0f} },   // 21
             MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1.0f, 1.0f} },   // 22
             MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0.0f, 1.0f} },   // 23
-    },
+        },
         std::array<uint32_t, 36>{
-        // Front face
-        0, 1, 2, 0, 2, 3,
+            // Front face
+            0, 1, 2, 0, 2, 3,
             // Back face
             4, 5, 6, 4, 6, 7,
             // Left face
@@ -191,14 +163,38 @@ int init() {
             16, 17, 18, 16, 18, 19,
             // Bottom face
             20, 21, 22, 20, 22, 23,
-    },
-        "Other cube"
+        }
     );
-    drawGroup.use_in_loop_task_graph(1, renderer.loop_task_graph);
 
-    // ----------------------------------------------------------------- //
+    meshManager.add_mesh<8, 36>("Cube3");
 
-    // ----------------------------- Keep ----------------------------- //
+    drawGroup.register_mesh(meshManager.get_mesh_ptr(2), renderer.loop_task_graph,
+        std::array<MyVertex, 8>{
+            MyVertex{ .position = {-0.5f, -0.5f, -0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, -0.5f}, .uv = {1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, -0.5f}, .uv = {1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, -0.5f}, .uv = {0, 1} },
+            MyVertex{ .position = {-0.5f, -0.5f, +0.5f}, .uv = {0, 0} },
+            MyVertex{ .position = {+0.5f, -0.5f, +0.5f}, .uv = {1, 0} },
+            MyVertex{ .position = {+0.5f, +0.5f, +0.5f}, .uv = {1, 1} },
+            MyVertex{ .position = {-0.5f, +0.5f, +0.5f}, .uv = {0, 1} },
+        },
+        std::array<uint32_t, 36>{
+            // front face
+            0, 2, 1, 2, 0, 3,
+            // right face
+            1, 6, 5, 6, 1, 2,
+            // back face
+            5, 7, 4, 7, 5, 6,
+            // left face
+            4, 3, 0, 3, 4, 7,
+            // top face
+            3, 6, 2, 6, 3, 7,
+            // bottom face
+            4, 1, 5, 1, 4, 0,
+        }
+    );
+
     int grid_size = 5;        // 5x5x5 grid of cubes
     float spacing = 2.0f;     // distance between cubes
 
@@ -217,13 +213,13 @@ int init() {
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
                     data.texture = view1;
                     data.tex_sampler = sampler;
-                    drawGroup.meshes[0].instance_data.push_back(data);
+                    drawGroup.meshes[0].lock()->instance_data.push_back(data);
                 }
             }
         }
 
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].instance_buffer_id).value();
-        memcpy(ptr, drawGroup.meshes[0].instance_data.data(), drawGroup.meshes[0].instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].lock()->instance_buffer_id).value();
+        memcpy(ptr, drawGroup.meshes[0].lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
 
     }
 
@@ -242,13 +238,13 @@ int init() {
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
                     data.texture = view2;
                     data.tex_sampler = sampler;
-                    drawGroup.meshes[1].instance_data.push_back(data);
+                    drawGroup2.meshes[1].lock()->instance_data.push_back(data);
                 }
             }
         }
 
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[1].instance_buffer_id).value();
-        memcpy(ptr, drawGroup.meshes[1].instance_data.data(), drawGroup.meshes[1].instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup2.meshes[1].lock()->instance_buffer_id).value();
+        memcpy(ptr, drawGroup2.meshes[1].lock()->instance_data.data(), drawGroup2.meshes[1].lock()->instance_data.size() * sizeof(PerInstanceData));
 
     }
 
@@ -266,13 +262,13 @@ int init() {
                     data.model_matrix = glm::translate(glm::mat4(1.0f), position);
                     data.texture = view1;
                     data.tex_sampler = sampler;
-                    drawGroup2.meshes[0].instance_data.push_back(data);
+                    drawGroup2.meshes[0].lock()->instance_data.push_back(data);
                 }
             }
         }
 
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup2.meshes[0].instance_buffer_id).value();
-        memcpy(ptr, drawGroup2.meshes[0].instance_data.data(), drawGroup2.meshes[0].instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup2.meshes[0].lock()->instance_buffer_id).value();
+        memcpy(ptr, drawGroup2.meshes[0].lock()->instance_data.data(), drawGroup2.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
     }
 
 	// ----------------------------------------------------------------- //
@@ -322,12 +318,12 @@ int init() {
                     int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
                     float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex); // Unique speed per instance
                     float angle = current_time * speed;
-                    drawGroup.meshes[0].instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+                    drawGroup.meshes[0].lock()->instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
                 }
             }
         }
-        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].instance_buffer_id).value();
-        std::memcpy(ptr, drawGroup.meshes[0].instance_data.data(), drawGroup.meshes[0].instance_data.size() * sizeof(PerInstanceData));
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].lock()->instance_buffer_id).value();
+        std::memcpy(ptr, drawGroup.meshes[0].lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
 
         for (int x = 0; x < grid_size; ++x) {
             for (int y = 0; y < grid_size; ++y) {
@@ -340,12 +336,12 @@ int init() {
                     int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
                     float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex);
                     float angle = current_time * speed;
-                    drawGroup.meshes[1].instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+                    drawGroup2.meshes[1].lock()->instance_data[cubeIndex].model_matrix = glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
                 }
             }
         }
-        auto* other_ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[1].instance_buffer_id).value();
-        std::memcpy(other_ptr, drawGroup.meshes[1].instance_data.data(), drawGroup.meshes[1].instance_data.size() * sizeof(PerInstanceData));
+        auto* other_ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup2.meshes[1].lock()->instance_buffer_id).value();
+        std::memcpy(other_ptr, drawGroup2.meshes[1].lock()->instance_data.data(), drawGroup2.meshes[1].lock()->instance_data.size() * sizeof(PerInstanceData));
         // ------------------------------------------------------- Goofy ahh test stuff ------------------------------------------------------
 
         renderer.endFrame();
