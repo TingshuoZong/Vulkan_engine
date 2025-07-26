@@ -18,7 +18,26 @@ void GLTF_Loader::OpenFile(const std::string& path) {
 
 void GLTF_Loader::LoadModel() {
     for (const auto& mesh : model.meshes) {
+        int texture_index = -1;
+        if (mesh.primitives[0].material >= 0) {
+            const auto& material = model.materials[mesh.primitives[0].material];
+            if (material.values.contains("baseColorTexture")) {
+                texture_index = material.values.at("baseColorTexture").TextureIndex();
+                const auto& image = model.images[model.textures[texture_index].source];
+                albedo = image;
+            }
+        }
+
         for (const auto& primitive : mesh.primitives) {
+            // Check if model contains multiple textures
+            if (primitive.material >= 0) {
+                const auto& this_material = model.materials[primitive.material];
+                if (this_material.values.contains("baseColorTexture")) {
+                     if (this_material.values.at("baseColorTexture").TextureIndex() != texture_index) {
+                         std::cerr << "Warning: Mesh has multiple textures, loading first one\n";
+                     }
+                }
+            }
             ParsedPrimitive parsed;
 
             // === POSITION ===
@@ -48,14 +67,16 @@ void GLTF_Loader::LoadModel() {
                     positions[i * 3 + 1],
                     positions[i * 3 + 2],
                 };
+
                 if (uvs && i < uvCount) {
                     v.uv = {
                         uvs[i * 2 + 0],
-                        1.0f - uvs[i * 2 + 1],  // Flip Y for Vulkan
+                        uvs[i * 2 + 1]
                     };
                 } else {
                     v.uv = {0.0f, 0.0f};
                 }
+
                 parsed.vertices.push_back(v);
             }
 

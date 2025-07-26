@@ -34,6 +34,6 @@ struct TextureHandle {
 
     void stream_texture_from_memory(std::string fileName);
     void stream_texture_from_data(const tinygltf::Image& gltf_image, std::string debug_name);
-    inline void load_textures_into_buffers(const stbi_uc* pixels, uint32_t size_bytes);
+    inline void load_textures_into_buffers(stbi_uc* pixels, uint32_t size_bytes);
     daxa::ImageViewId load_texture(daxa::TaskGraph& loop_task_graph);
 };

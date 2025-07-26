@@ -3,7 +3,7 @@
 #include "shared.inl"
 
 #include <tiny_gltf.h>
-
+#include <stb_image.h>
 
 struct ParsedPrimitive {
     std::vector<Vertex> vertices;
@@ -20,9 +20,12 @@ public:
 
     void OpenFile(const std::string& path);
     void LoadModel();
+
+    std::vector<ParsedPrimitive> modelData;
+    std::optional<tinygltf::Image> albedo;
 private:
     tinygltf::TinyGLTF loader;
     tinygltf::Model model;
 
-    std::vector<ParsedPrimitive> modelData;
+
 };
