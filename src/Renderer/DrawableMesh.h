@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shared.inl"  // For UniformBufferObject or MyPushConstant
+#include "shared.inl"  // For UniformBufferObject or PushConstant
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/task_graph.hpp>
@@ -29,7 +29,7 @@ struct DrawableMesh {
         : device(&device), vertex_count(vertex_count), index_count(index_count), name(name) {
 
         vertex_buffer_id = device.create_buffer({
-            .size = sizeof(MyVertex) * vertex_count,
+            .size = sizeof(Vertex) * vertex_count,
             .name = name + " vertex buffer",
         });
         index_buffer_id = device.create_buffer({
@@ -66,7 +66,7 @@ struct DrawableMesh {
     template<size_t VertexCount, size_t IndexCount>
     void upload_mesh_data_task(
         daxa::TaskGraph& tg,
-        const std::array<MyVertex, VertexCount>& vertex_data,
+        const std::array<Vertex, VertexCount>& vertex_data,
         const std::array<uint32_t, IndexCount>& index_data
     );
 };
@@ -74,9 +74,12 @@ struct DrawableMesh {
 template<size_t VertexCount, size_t IndexCount>
 void DrawableMesh::upload_mesh_data_task(
     daxa::TaskGraph& tg,
-    const std::array<MyVertex, VertexCount>& vertex_data,
+    const std::array<Vertex, VertexCount>& vertex_data,
     const std::array<uint32_t, IndexCount>& index_data
 ) {
+    tg.use_persistent_buffer(task_vertex_buffer);
+    tg.use_persistent_buffer(task_index_buffer);
+
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, this->task_vertex_buffer),
@@ -89,7 +92,7 @@ void DrawableMesh::upload_mesh_data_task(
                            .name = this->name + ">" + name + "vertex staging buffer",
             });
             ti.recorder.destroy_buffer_deferred(vertex_staging);
-            auto* vertex_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, VertexCount>>(vertex_staging).value();
+            auto* vertex_ptr = ti.device.buffer_host_address_as<std::array<Vertex, VertexCount>>(vertex_staging).value();
             *vertex_ptr = vertex_data;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = vertex_staging,
@@ -112,5 +115,5 @@ void DrawableMesh::upload_mesh_data_task(
             });
         },
         .name = this->name + ">" + name + " upload mesh data",
-        });
+    });
 }

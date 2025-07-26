@@ -2,15 +2,15 @@
 
 #include <shared.inl>
 
-// Enabled the push constant MyPushConstant we specified in shared.inl
-DAXA_DECL_PUSH_CONSTANT(MyPushConstant, push)
+// Enabled the push constant PushConstant we specified in shared.inl
+DAXA_DECL_PUSH_CONSTANT(PushConstant, push)
 
 
 layout(location = 0) out daxa_f32vec2 v_uv;
 layout(location = 1) flat out int v_InstanceIndex;
 
 void main() {
-    MyVertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
+    Vertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
     PerInstanceData instData = deref(push.instance_buffer_ptr[gl_InstanceIndex]);
     UniformBufferObject ubo = deref(push.ubo_ptr);
 

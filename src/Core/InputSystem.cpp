@@ -4,7 +4,7 @@ namespace InputSystem {
     bool mouse_captured = true;
 
     void process_input(GLFWwindow* window, Camera& camera, float delta_time) {
-        auto* app = static_cast<AppWindow*>(glfwGetWindowUserPointer(window));
+        auto* app = static_cast<GLFW_Window::AppWindow*>(glfwGetWindowUserPointer(window));
         if (!app || !app->camera_ptr) return;
 
         float velocity = camera.movement_speed * delta_time;
@@ -30,7 +30,7 @@ namespace InputSystem {
         static float last_x = 800.0f / 2;
         static float last_y = 600.0f / 2;
 
-        auto* app = static_cast<AppWindow*>(glfwGetWindowUserPointer(window));
+        auto* app = static_cast<GLFW_Window::AppWindow*>(glfwGetWindowUserPointer(window));
         if (!app || !app->camera_ptr) return;
 
         Camera& camera = *app->camera_ptr;

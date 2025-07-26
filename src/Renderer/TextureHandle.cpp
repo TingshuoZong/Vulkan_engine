@@ -1,6 +1,5 @@
 #include "TextureHandle.h"
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 TextureHandle::TextureHandle(daxa::Device& device, std::string fileName)

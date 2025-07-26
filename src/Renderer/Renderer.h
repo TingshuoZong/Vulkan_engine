@@ -20,7 +20,7 @@ constexpr float V_FOV = 60.0f;
 
 struct Renderer {
     // TODO: implement a name to prevent daxa name conflicts
-    AppWindow& window;
+    GLFW_Window::AppWindow& window;
 
     daxa::Device& device;
     daxa::Instance& instance;
@@ -37,7 +37,7 @@ struct Renderer {
     daxa::TaskImage task_swapchain_image;
     daxa::TaskGraph loop_task_graph;
 
-    Renderer(AppWindow& window, daxa::Device& device, daxa::Instance& instance);
+    Renderer(GLFW_Window::AppWindow& window, daxa::Device& device, daxa::Instance& instance);
 
     static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo);
 

@@ -17,10 +17,7 @@ struct DrawGroup {
 	DrawGroup(daxa::Device& device, const std::shared_ptr<daxa::RasterPipeline> &pipeline, std::string name);
 	void cleanup();
 
-	template<size_t VertexCount, size_t IndexCount>
-	void register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph, const std::array<MyVertex, VertexCount> vertex_data, const std::array<uint32_t, IndexCount>& index_data);
-	template<size_t VertexCount, size_t IndexCount>
-	void update_mesh(uint32_t mesh_index, daxa::TaskGraph& loop_task_graph, const std::array<MyVertex, VertexCount>& vertex_data, const std::array<uint32_t, IndexCount>& index_data);
+	inline void register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph);
 
 	void add_mesh_instance(uint32_t mesh_index, PerInstanceData data);
 
@@ -35,22 +32,7 @@ private:
 };
 
 
-template<size_t VertexCount, size_t IndexCount>
-void DrawGroup::register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph, const std::array<MyVertex, VertexCount> vertex_data, const std::array<uint32_t, IndexCount>& index_data) {
-	auto upload_task_graph = daxa::TaskGraph({
-		.device = device,
-		.name = this->name + ">" + drawableMesh.lock()->name + " upload",
-	});
-
-    upload_task_graph.use_persistent_buffer(drawableMesh.lock()->task_vertex_buffer);
-    upload_task_graph.use_persistent_buffer(drawableMesh.lock()->task_index_buffer);
-
-	drawableMesh.lock()->upload_mesh_data_task<VertexCount, IndexCount>(upload_task_graph, vertex_data, index_data);
-
-	upload_task_graph.submit({});
-	upload_task_graph.complete({});
-	upload_task_graph.execute({});
-
+inline void DrawGroup::register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph) {
 	meshes.push_back(drawableMesh);
 	use_in_loop_task_graph(meshes.size() - 1, loop_task_graph);
 }

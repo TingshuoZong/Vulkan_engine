@@ -3,8 +3,8 @@
 
 #include <shared.inl>
 
-// Enabled the push constant MyPushConstant we specified in shared.inl
-DAXA_DECL_PUSH_CONSTANT(MyPushConstant, push)
+// Enabled the push constant PushConstant we specified in shared.inl
+DAXA_DECL_PUSH_CONSTANT(PushConstant, push)
 
 layout(location = 0) in daxa_f32vec2 v_uv;
 layout(location = 1) flat in int v_InstanceIndex;

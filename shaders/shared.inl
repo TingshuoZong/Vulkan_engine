@@ -42,17 +42,17 @@
 #endif
 
 // Code that can be 100% shared between CPU and GPU
-struct MyVertex {
+struct Vertex {
     daxa_f32vec3 position;
     daxa_f32vec2 uv;
 };
 
-DAXA_DECL_BUFFER_PTR(MyVertex)
+DAXA_DECL_BUFFER_PTR(Vertex)
 DAXA_DECL_BUFFER_PTR(UniformBufferObject)
 DAXA_DECL_BUFFER_PTR(PerInstanceData)
 
-struct MyPushConstant {
-    daxa_BufferPtr(MyVertex) my_vertex_ptr;
+struct PushConstant {
+    daxa_BufferPtr(Vertex) my_vertex_ptr;
     daxa_BufferPtr(UniformBufferObject) ubo_ptr;
     daxa_BufferPtr(PerInstanceData) instance_buffer_ptr;
 };

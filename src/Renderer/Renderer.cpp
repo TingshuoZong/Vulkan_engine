@@ -81,7 +81,7 @@ void Renderer::draw_mesh_task(
                     .index_type = daxa::IndexType::uint32,
                 });
 
-                render_recorder.push_constant(MyPushConstant{
+                render_recorder.push_constant(PushConstant{
                     .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_vertex_buffer).ids[0]).value(),
                     .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
                     .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_instance_buffer).ids[0]).value(),
@@ -107,7 +107,7 @@ void Renderer::update_uniform_buffer(const daxa::Device& device, const daxa::Buf
     *ptr = ubo;
 }
 
-Renderer::Renderer(AppWindow& window, daxa::Device& device, daxa::Instance& instance)
+Renderer::Renderer(GLFW_Window::AppWindow& window, daxa::Device& device, daxa::Instance& instance)
     : window(window), device(device), instance(instance) {
 
     swapchain = device.create_swapchain({
@@ -157,8 +157,6 @@ void Renderer::init() {
     });
 
     task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
-
-
 
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
