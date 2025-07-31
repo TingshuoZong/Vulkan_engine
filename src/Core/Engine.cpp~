@@ -3,16 +3,19 @@
 #include "window.h"
 #include "shared.inl"
 
-#include "Renderer/DrawableMesh.h"
-#include "Renderer/DrawGroup.h"
-#include "Renderer/TextureHandle.h"
+#include "Renderer/Meshes/DrawableMesh.h"
+#include "Renderer/Meshes/DrawGroup.h"
+#include "Renderer/Meshes/ManagedMesh.h"
+#include "Renderer/Textures/TextureHandle.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/MeshManager.h"
 
 #include "Core/Camera.h"
-#include "Core/InputSystem.h"
+#include "Core/InputSystem/InputSystem.h"
 
 #include "Tools/Model_loader.h"
+
+#include "ECS/ECS.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -85,21 +88,28 @@ int init() {
     TextureHandle texture1 = TextureHandle(device);
     daxa::ImageViewId view1;
 
+    EntityManager entityManager;
+    Entity avocadoEntity = entityManager.create_entity();
+    auto& meshComponenetManager = entityManager.get_component_manager<ManagedMesh>();
+
     {
         GLTF_Loader loader;
-        loader.OpenFile("C:/dev/Engine_project/assets/Cursed_Mwerpy_glTF/Untitled.gltf"); //"C:/dev/Engine_project/assets/Cursed_Mwerpy_glTF/Untitled.gltf"
+        loader.OpenFile("C:/dev/Engine_project/assets/Avocado_glTF/Avocado.gltf"); //"C:/dev/Engine_project/assets/Cursed_Mwerpy_glTF/Untitled.gltf"
         loader.LoadModel();
 
         if (loader.albedo.has_value()) {
             texture1.stream_texture_from_data(loader.albedo.value(), "Avocade texture");
             view1 = texture1.load_texture(renderer.loop_task_graph);
         }
+        
+        // TextureData avocadoTexutreData = {texture1, view1};
+        meshComponenetManager.add_component(avocadoEntity, ManagedMesh(loader, meshManager, drawGroup, renderer, {}));
 
-        meshManager.add_mesh("Avocado", loader.getModelData(0).vertexCount, loader.getModelData(0).indexCount);
-        meshManager.upload_mesh_data_task(0, meshManager.upload_task_graph, loader.getModelData(0).vertices, loader.getModelData(0).indices);
-
-        drawGroup.register_mesh(meshManager.get_mesh_ptr(0), renderer.loop_task_graph);
-        meshManager.submit_upload_task_graph();
+        // meshManager.add_mesh("Avocado", loader.getModelData(0).vertexCount, loader.getModelData(0).indexCount);
+        // meshManager.upload_mesh_data_task(0, meshManager.upload_task_graph, loader.getModelData(0).vertices, loader.getModelData(0).indices);
+        //
+        // drawGroup.register_mesh(meshManager.get_mesh_ptr(0), renderer.loop_task_graph);
+        // meshManager.submit_upload_task_graph();
     }
 
      //DrawGroup drawGroup2(device, pipeline, "My Other DrawGroup");
@@ -345,7 +355,7 @@ int init() {
                     int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
                     float speed = 0.2f + 0.1f * static_cast<float>(cubeIndex); // Unique speed per instance
                     float angle = current_time * speed;
-                    drawGroup.meshes[0].lock()->instance_data[cubeIndex].model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0)), glm::vec3(0.33f));
+                    drawGroup.meshes[0].lock()->instance_data[cubeIndex].model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0)), glm::vec3(25.0f));
                 }
             }
         }

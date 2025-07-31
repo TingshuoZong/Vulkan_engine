@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DrawableMesh.h"
+#include "Meshes/DrawableMesh.h"
 
 class MeshManager {
 public:

@@ -23,6 +23,8 @@ public:
 
     std::vector<ParsedPrimitive> modelData;
     std::optional<tinygltf::Image> albedo;
+
+    std::string path;
 private:
     tinygltf::TinyGLTF loader;
     tinygltf::Model model;

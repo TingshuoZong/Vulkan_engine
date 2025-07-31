@@ -13,6 +13,8 @@ void GLTF_Loader::OpenFile(const std::string& path) {
         std::cerr << "Failed to load glTF model\n";
         return;
     }
+
+    this->path = path;
 }
 
 

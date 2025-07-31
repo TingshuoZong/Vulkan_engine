@@ -17,7 +17,8 @@ struct IComponentManager {
 template <typename T>
 class ComponentManager: public IComponentManager {
 public:
-    void add_component(Entity entity, T& component) {
+    template <typename U>
+    void add_component(Entity entity, U&& component) {
         if (entity_to_component_index.contains(entity)) {
             components[entity_to_component_index[entity]] = component;
 	    } else {

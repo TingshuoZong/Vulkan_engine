@@ -62,6 +62,10 @@ endforeach()
 
 add_executable(${PROJECT_NAME} ${SRCS})
 
+target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/permissive->
+)
+
 target_include_directories(${PROJECT_NAME} PUBLIC 
     ${PROJECT_SOURCE_DIR}/shaders
     ${PROJECT_SOURCE_DIR}/lib/glm

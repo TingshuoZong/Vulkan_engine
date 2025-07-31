@@ -4,7 +4,7 @@
 #include <tiny_gltf.h>
 
 #include <Core/Engine.h>
-#include <Core/ECS.h>
+#include <Core/ECS/ECS.h>
 
 struct TestComponent {
 	int componentNum = 0;

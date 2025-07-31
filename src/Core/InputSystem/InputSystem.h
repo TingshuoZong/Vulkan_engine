@@ -1,7 +1,7 @@
 #pragma once
 
 #include "window.h"
-#include "Camera.h"
+#include "../Camera.h"
 
 
 namespace InputSystem {

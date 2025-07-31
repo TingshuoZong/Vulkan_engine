@@ -9,7 +9,6 @@
     #include <glm/gtc/matrix_transform.hpp>
 
     struct UniformBufferObject {
-        glm::mat4 model;
         glm::mat4 view;
         glm::mat4 proj;
     };
@@ -27,9 +26,8 @@
     #include <daxa/daxa.glsl>
 
     struct UniformBufferObject {
-        mat4 model;
-        mat4 view;
-        mat4 proj;
+        daxa_f32mat4x4 view;
+        daxa_f32mat4x4 proj;
     };
 
     struct PerInstanceData {
