@@ -1,5 +1,6 @@
 .build/*
 .build-clangd-linux/*
+.cache/*
 .vs/*
 .idea/*
 vcpkg_installed/*
