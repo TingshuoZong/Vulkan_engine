@@ -1,1 +1,5 @@
 *.gltf text eof=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eof=lf
+.gitattributes text eof=lf

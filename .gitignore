@@ -4,7 +4,8 @@
 .vs/*
 .idea/*
 vcpkg_installed/*
-lib/*
+lib/Daxa/*
+lib/vcpkg/*
 out/*
 compile_commands.json
 CMakePresets.json
