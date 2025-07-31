@@ -4,7 +4,7 @@
 #include "DrawGroup.h"
 #include "shared.inl"
 
-#include "Core/ECS/ECS.h"
+#include "Core/ECS/ECS_Component.h"
 #include "Renderer/MeshManager.h"
 #include "Renderer/Renderer.h"
 
@@ -48,11 +48,14 @@ public:
 
     void instanciate(Entity entity, ComponentManager<ManagedMesh>& componentManager, TextureData textures) {
         if (instanceNo == 0) {
-            componentManager.add_component(entity, ManagedMesh(numberOfInstances, mesh.lock(), textures));
+            componentManager.addComponent(entity, ManagedMesh(numberOfInstances, mesh.lock(), textures));
             numberOfInstances++;
         } else std::cerr << "Warning: Instanciate failed: only the first instance of a mesh can instanciate meshes\n";
     }
 
+    PerInstanceData& getInstanceData() {
+        return mesh.lock()->instance_data[instanceNo];
+    }
 
 private:
     int instanceNo = 0;    // If instanceo is 0 it is the actual mesh that is being instanced

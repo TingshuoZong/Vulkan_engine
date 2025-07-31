@@ -11,7 +11,8 @@
 #include "Renderer/MeshManager.h"
 
 #include "Core/Camera.h"
-#include "Core/InputSystem/InputSystem.h"
+
+#include "Engine/InputSystem/InputSystem.h"
 
 #include "Tools/Model_loader.h"
 
@@ -65,15 +66,6 @@ int init() {
         }
         pipeline = result.value();
     }
-    //TextureHandle texture1 = TextureHandle(device, "test_texture.jpg");
-    //texture1.stream_texture_from_memory();
-
-    //daxa::ImageViewId view1 = texture1.load_texture(renderer.loop_task_graph);
-
-    //TextureHandle texture2 = TextureHandle(device, "test_texture2.jpg");
-    //texture2.stream_texture_from_memory();
-
-    //daxa::ImageViewId view2 = texture2.load_texture(renderer.loop_task_graph);
 
     daxa::SamplerId sampler = device.create_sampler({
         .magnification_filter = daxa::Filter::LINEAR,
@@ -88,10 +80,9 @@ int init() {
     TextureHandle texture1 = TextureHandle(device);
     daxa::ImageViewId view1;
 
-    EntityManager entityManager;
     std::vector<Entity> avocadoEntities;
-    avocadoEntities.push_back(entityManager.create_entity());
-    auto& meshComponenetManager = entityManager.get_component_manager<ManagedMesh>();
+    avocadoEntities.push_back(ecs::entityManager.createEntity());
+    auto& meshComponenetManager = ecs::entityManager.getComponentManager<ManagedMesh>();
 
     {
         GLTF_Loader loader;
@@ -104,12 +95,11 @@ int init() {
         }
 
         // TextureData avocadoTexutreData = {texture1, view1};
-        meshComponenetManager.add_component(avocadoEntities[0], ManagedMesh(loader, meshManager, drawGroup, renderer, {view1, sampler}));
-
-        entityManager.get_component_manager<ManagedMesh>().get_component(avocadoEntities[0])->mesh.lock()->instance_data[0].model_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(25.0f));
+        ecs::getComponentManager<ManagedMesh>().addComponent(avocadoEntities[0], ManagedMesh(loader, meshManager, drawGroup, renderer, {view1, sampler}));
+        ecs::getComponent<ManagedMesh>(avocadoEntities[0])->getInstanceData().model_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(25.0f));
 
         auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].lock()->instance_buffer_id).value();
-        memcpy(ptr, entityManager.get_component_manager<ManagedMesh>().get_component(avocadoEntities[0])->mesh.lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
+        memcpy(ptr, ecs::entityManager.getComponentManager<ManagedMesh>().getComponent(avocadoEntities[0])->mesh.lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
     }
 
     int grid_size = 10;
@@ -128,13 +118,13 @@ int init() {
                     int entityIndex = x * grid_size * grid_size + y * grid_size + z;
 
                     if (entityIndex != 0) {
-                        avocadoEntities.push_back(entityManager.create_entity());
-                        entityManager.get_component_manager<ManagedMesh>().get_component(avocadoEntities[0])->instanciate(avocadoEntities[entityIndex], meshComponenetManager, { view1, sampler });
+                        avocadoEntities.push_back(ecs::entityManager.createEntity());
+                        ecs::getComponent<ManagedMesh>(avocadoEntities[0])->instanciate(avocadoEntities[entityIndex], meshComponenetManager, { view1, sampler });
                     }
 
                     glm::mat4 model_matrix;
                     model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), position), glm::vec3(1.0f));
-                    entityManager.get_component_manager<ManagedMesh>().get_component(avocadoEntities[entityIndex])->mesh.lock()->instance_data[entityIndex].model_matrix = model_matrix;
+                    ecs::getComponent<ManagedMesh>(avocadoEntities[entityIndex])->getInstanceData().model_matrix = model_matrix;
                 }
             }
         }
