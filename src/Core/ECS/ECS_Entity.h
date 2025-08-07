@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cstdint>
 #include <iostream>
 #include <typeindex>
 #include <unordered_map>
-#include <vector>
 
 #include "ECS_Component.h"
+#include "ECS_System.h"
 
 static Entity next_entity_id = 1;
 
@@ -17,21 +16,44 @@ public:
         return next_entity_id - 1;
     }
 
-    template<typename T>
+    template <typename T>
+    void registerComponentManager() {
+        const auto typeIndex = std::type_index(typeid(T));
+        if (!componentManagers.contains(typeIndex)) {
+            auto manager = std::make_unique<ComponentManager<T>>();
+            componentManagers[typeIndex] = std::move(manager);
+        }
+    }
+
+    template <typename T>
     ComponentManager<T>& getComponentManager() {
         const auto typeIndex = std::type_index(typeid(T));
         const auto componentManager = componentManagers.find(typeIndex);
 
-        if (componentManager == componentManagers.end()) {
-            auto manager = std::make_unique<ComponentManager<T>>();
+        if (componentManager != componentManagers.end())
+            return *static_cast<ComponentManager<T>*>(componentManager->second.get());
+        else
+            throw std::runtime_error("Error: EntityManager does not have a componentManager");
+    }
 
-            ComponentManager<T>* ptr = manager.get();
-            componentManagers[typeIndex] = std::move(manager);
+    template <typename T, typename... Args>
+    inline void registerSystem(Args&&... args) {
+        systemManager.registerSystem<T>(std::forward<Args>(args)...);
+    }
 
-            return *ptr;
-        }
-        return *static_cast<ComponentManager<T>*>(componentManager->second.get());
+    template <typename T>
+    inline T& getSystem() {
+        return systemManager.getSystem<T>();
+    }
+
+    inline SystemManager& getSystemManager() {
+		return systemManager;
+	}
+    
+    inline void updateSystems() {
+        systemManager.updateSystems();
     }
 private:
     std::unordered_map<std::type_index, std::unique_ptr<IComponentManager>> componentManagers;
+    SystemManager systemManager;
 };

@@ -57,8 +57,8 @@ int init() {
                 .max_depth_bounds = 1.0f,
             },
             .raster = daxa::RasterizerInfo{
-                .face_culling = daxa::FaceCullFlagBits::BACK_BIT,
-                .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
+                .face_culling = daxa::FaceCullFlagBits::BACK_BIT, // Optional but recommended
+                .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE, // Adjust to match your index winding
             },
             .push_constant_size = sizeof(PushConstant),
             .name = "my pipeline",
@@ -90,15 +90,11 @@ int init() {
     ecs::entityManager.registerComponentManager<ManagedMesh>();    
     auto& meshComponenetManager = ecs::entityManager.getComponentManager<ManagedMesh>();
 
-    ecs::entityManager.registerComponentManager<TransformComponent>();
-
     ecs::entityManager.registerSystem<TransformSystem>(device, meshComponenetManager);
-
-    auto& entityManagerDbgRef = ecs::entityManager;
 
     {
         GLTF_Loader loader;
-        loader.OpenFile("C:/dev/Engine_project/assets/Avocado_glTF/Avocado.gltf");
+        loader.OpenFile("C:/dev/Engine_project/assets/Avocado_glTF/Avocado.gltf"); //"C:/dev/Engine_project/assets/Cursed_Mwerpy_glTF/Untitled.gltf"
         loader.LoadModel();
 
         if (loader.albedo.has_value()) {
@@ -106,15 +102,19 @@ int init() {
             view1 = texture1.load_texture(renderer.loop_task_graph);
         }
 
+        // TextureData avocadoTexutreData = {texture1, view1};
         ecs::getComponentManager<ManagedMesh>().addComponent(avocadoEntities[0], ManagedMesh(loader, meshManager, drawGroup, renderer, {view1, sampler}));
-        ecs::getComponentManager<TransformComponent>().addComponent(avocadoEntities[0], TransformComponent(ecs::entityManager, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f)));
+        ecs::getComponent<ManagedMesh>(avocadoEntities[0])->getInstanceData().model_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(25.0f));
+
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].lock()->instance_buffer_id).value();
+        memcpy(ptr, ecs::entityManager.getComponentManager<ManagedMesh>().getComponent(avocadoEntities[0])->mesh.lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
     }
 
-    int grid_size = 5;
+    int grid_size = 10;
 	float spacing = 0.08f;
     
     {
-
+    
         for (int x = 0; x < grid_size; ++x) {
             for (int y = 0; y < grid_size; ++y) {
                 for (int z = 0; z < grid_size; ++z) {
@@ -123,24 +123,30 @@ int init() {
                         (y - grid_size / 2) * spacing,
                         (z - grid_size / 2) * spacing
                     );
-                    int cubeIndex = x * grid_size * grid_size + y * grid_size + z; // Unique speed per instance
-                    
-                    if (cubeIndex != 0) {
+                    int entityIndex = x * grid_size * grid_size + y * grid_size + z;
+
+                    if (entityIndex != 0) {
                         avocadoEntities.push_back(EntityManager::createEntity());
-                        ecs::getComponent<ManagedMesh>(avocadoEntities[0])->instantiate(avocadoEntities[cubeIndex], meshComponenetManager, { view1, sampler });
-                        ecs::getComponentManager<TransformComponent>().addComponent(avocadoEntities[cubeIndex], TransformComponent(ecs::entityManager, position, glm::vec3(0.0f), glm::vec3(1.0f)));
-                    } else {
-                        ecs::getComponent<TransformComponent>(avocadoEntities[0])->setPosition(position);
+                        ecs::getComponent<ManagedMesh>(avocadoEntities[0])->instantiate(avocadoEntities[entityIndex], meshComponenetManager, { view1, sampler });
                     }
+
+                    glm::mat4 model_matrix;
+                    model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), position), glm::vec3(1.0f));
+                    ecs::getComponent<ManagedMesh>(avocadoEntities[entityIndex])->getInstanceData().model_matrix = model_matrix;
                 }
             }
         }
+    
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].lock()->instance_buffer_id).value();
+        memcpy(ptr, drawGroup.meshes[0].lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
+    
     }
 
     std::vector<DrawGroup> drawGroups;
-
     drawGroups.push_back(drawGroup);
+    //drawGroups.push_back(drawGroup2);
     renderer.drawGroups.push_back(drawGroup);
+    //renderer.drawGroups.push_back(drawGroup2);
 
     renderer.submit_task_graph();
 
@@ -148,13 +154,14 @@ int init() {
     camera.update_vectors();
 
     auto* glfw_window = window.get_glfw_window();
+    //glfwSetWindowUserPointer(glfw_window, &camera);
     window.camera_ptr = &camera;
     glfwSetCursorPosCallback(glfw_window, InputSystem::mouse_callback);
 
+    // Capture the mouse cursor (optional)
     window.set_mouse_capture(true);
 
     auto last_frame_time = static_cast<float>(glfwGetTime());
-    ecs::updateSystems();
 
     // Main loop
     while (!window.should_close()) {
@@ -171,6 +178,8 @@ int init() {
         
         renderer.startFrame(camera);
 
+        ecs::getSystem<TransformSystem>()
+
         // ------------------------------------------------------ Goofy ahh test stuff ------------------------------------------------------
         for (int x = 0; x < grid_size; ++x) {
             for (int y = 0; y < grid_size; ++y) {
@@ -183,12 +192,13 @@ int init() {
                     int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
                     float speed = 0.04f * static_cast<float>(cubeIndex); // Unique speed per instance
                     float angle = current_time * speed;
-                    ecs::getComponent<TransformComponent>(avocadoEntities[cubeIndex])->setRotation(glm::vec3(0.0f, angle, 0.0f));
+                    drawGroup.meshes[0].lock()->instance_data[cubeIndex].model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), position) * glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0)), glm::vec3(1.0f));
                 }
             }
         }
+        auto* ptr = device.buffer_host_address_as<PerInstanceData>(drawGroup.meshes[0].lock()->instance_buffer_id).value();
+        std::memcpy(ptr, drawGroup.meshes[0].lock()->instance_data.data(), drawGroup.meshes[0].lock()->instance_data.size() * sizeof(PerInstanceData));
         // ------------------------------------------------------- Goofy ahh test stuff ------------------------------------------------------
-        ecs::updateSystems();
 
         renderer.endFrame();
     }

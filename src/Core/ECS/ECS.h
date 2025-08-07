@@ -1,11 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <iostream>
-#include <typeindex>
-#include <unordered_map>
-#include <vector>
-
 #include "ECS_Entity.h"
 #include "ECS_Component.h"
 
@@ -20,5 +14,18 @@ namespace ecs {
     template <typename T>
     inline ComponentManager<T>& getComponentManager() {
         return entityManager.getComponentManager<T>();
+    }
+
+    template <typename T>
+    inline T* getSystem() {
+        return entityManager.getSystemManager().getSystem();
+    }
+
+    inline SystemManager& getSystemManager() {
+        return entityManager.getSystemManager();
+    }
+
+    inline void updateSystems() {
+        entityManager.updateSystems();
     }
 }
