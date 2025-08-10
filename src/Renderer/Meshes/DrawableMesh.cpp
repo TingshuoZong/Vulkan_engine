@@ -13,7 +13,7 @@ void DrawableMesh::upload_mesh_data_task(
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, this->task_vertex_buffer),
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, this->task_index_buffer),
         },
-        .task = [=](daxa::TaskInterface ti) {
+        .task = [=, this](daxa::TaskInterface ti) {
             auto vertex_staging = ti.device.create_buffer({
                            .size = vertex_data.size() * sizeof(Vertex),
                            .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,

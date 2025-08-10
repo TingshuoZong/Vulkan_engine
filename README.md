@@ -15,3 +15,9 @@ The ECS exists as a singleton accessed through the `ecs` namespace.
 ## Low-level systems
 
 Apart from the ECS it is also possible to interact with and extend the engine's systems by directly interacting with the engine's low level systems and abstractions.
+
+### glTF Loading
+
+Then game engine uses glTFs to store level data, these can be editied in separate editors i.e. Blender.
+
+**Note:** Meshes in the engine are equivalent to primitives in glTFs

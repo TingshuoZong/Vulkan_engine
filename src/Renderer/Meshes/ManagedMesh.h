@@ -19,15 +19,18 @@ class ManagedMesh : public IComponent {
 public:
     std::weak_ptr<DrawableMesh> mesh;
 
-    ManagedMesh(GLTF_Loader& loader, MeshManager& meshManager, DrawGroup& drawGroup, const Renderer& renderer, TextureData texture)
+    ManagedMesh(GLTF_Loader& loader, int meshNo, int primitiveNo, MeshManager& meshManager, DrawGroup& drawGroup, const Renderer& renderer, TextureData texture)
         : transform(), textures() {
         // Add a new mesh
-        mesh = meshManager.add_mesh(loader.path, loader.getModelData(0).vertexCount, loader.getModelData(0).indexCount);
-        meshManager.upload_mesh_data_task(0, meshManager.upload_task_graph, loader.getModelData(0).vertices,
-                                          loader.getModelData(0).indices);
+        mesh = meshManager.add_mesh(loader.path + std::to_string(meshNo) + std::to_string(primitiveNo),
+            loader.getModelData(meshNo, primitiveNo).vertexCount,
+            loader.getModelData(meshNo, primitiveNo).indexCount);
 
-        drawGroup.register_mesh(meshManager.get_mesh_ptr(0), renderer.loop_task_graph);
-        meshManager.submit_upload_task_graph();
+        meshManager.upload_mesh_data_task(meshManager.upload_task_graph, 
+            loader.getModelData(meshNo, primitiveNo).vertices,
+            loader.getModelData(meshNo, primitiveNo).indices);
+
+        drawGroup.register_mesh(meshManager.get_mesh_ptr(meshManager.meshIndex), renderer.loop_task_graph);
 
         mesh.lock()->instance_data.push_back({
             .model_matrix = glm::mat4(1.0f),
@@ -38,7 +41,7 @@ public:
 
     ManagedMesh(const int instanceNo, const std::weak_ptr<DrawableMesh>& mesh, TextureData texture)
         : instanceNo(instanceNo), mesh(mesh), transform(), textures() {
-        // Add a instanced mesh
+        // Add an instanced mesh
 
         mesh.lock()->instance_data.push_back({
             .model_matrix = glm::mat4(1.0f),

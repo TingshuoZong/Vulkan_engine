@@ -81,67 +81,78 @@ int init() {
 // -----------------------------------------------------------------------------------------------------------------
     MeshManager meshManager(device);
     DrawGroup drawGroup(device, pipeline, "My DrawGroup");
-    TextureHandle texture1 = TextureHandle(device);
-    daxa::ImageViewId view1;
 
-    std::vector<Entity> avocadoEntities;
-    avocadoEntities.push_back(EntityManager::createEntity());
+    BulkTextureUploadManager uploadManager;
+
+    std::vector<std::unique_ptr<TextureHandle>> textures;
+    std::vector<daxa::ImageViewId> views;
+
+    std::vector<Entity> testEntities;
 
     ecs::entityManager.registerComponentManager<ManagedMesh>();    
-    auto& meshComponenetManager = ecs::entityManager.getComponentManager<ManagedMesh>();
 
     ecs::entityManager.registerComponentManager<TransformComponent>();
-
-    ecs::entityManager.registerSystem<TransformSystem>(device, meshComponenetManager);
-
-    auto& entityManagerDbgRef = ecs::entityManager;
+    ecs::entityManager.registerSystem<TransformSystem>(device, ecs::entityManager.getComponentManager<ManagedMesh>());
 
     {
         GLTF_Loader loader;
-        loader.OpenFile("C:/dev/Engine_project/assets/Avocado_glTF/Avocado.gltf");
+        loader.OpenFile("C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf");    //"C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf"
         loader.LoadModel();
 
-        if (loader.albedo.has_value()) {
-            texture1.stream_texture_from_data(loader.albedo.value(), "Avocado texture");
-            view1 = texture1.load_texture(renderer.loop_task_graph);
-        }
+        for (int model_i = 0; model_i < loader.modelData.size(); ++model_i) {
+            for (int prim_i = 0; prim_i < loader.modelData[model_i].primitives.size(); ++prim_i) {
+                testEntities.push_back(EntityManager::createEntity());
 
-        ecs::getComponentManager<ManagedMesh>().addComponent(avocadoEntities[0], ManagedMesh(loader, meshManager, drawGroup, renderer, {view1, sampler}));
-        ecs::getComponentManager<TransformComponent>().addComponent(avocadoEntities[0], TransformComponent(ecs::entityManager, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f)));
-    }
-
-    int grid_size = 5;
-	float spacing = 0.08f;
-    
-    {
-
-        for (int x = 0; x < grid_size; ++x) {
-            for (int y = 0; y < grid_size; ++y) {
-                for (int z = 0; z < grid_size; ++z) {
-                    glm::vec3 position = glm::vec3(
-                        (x - grid_size / 2) * spacing,
-                        (y - grid_size / 2) * spacing,
-                        (z - grid_size / 2) * spacing
-                    );
-                    int cubeIndex = x * grid_size * grid_size + y * grid_size + z; // Unique speed per instance
-                    
-                    if (cubeIndex != 0) {
-                        avocadoEntities.push_back(EntityManager::createEntity());
-                        ecs::getComponent<ManagedMesh>(avocadoEntities[0])->instantiate(avocadoEntities[cubeIndex], meshComponenetManager, { view1, sampler });
-                        ecs::getComponentManager<TransformComponent>().addComponent(avocadoEntities[cubeIndex], TransformComponent(ecs::entityManager, position, glm::vec3(0.0f), glm::vec3(1.0f)));
-                    } else {
-                        ecs::getComponent<TransformComponent>(avocadoEntities[0])->setPosition(position);
-                    }
+                if (loader.modelData[model_i].primitives[prim_i].albedo.has_value()) {
+                    textures.push_back(std::make_unique<TextureHandle>(device));
+                    std::string debug_name = "Sponza_" + std::to_string(model_i) + "_" + std::to_string(prim_i);
+                    textures.back()->stream_texture_from_data(loader.modelData[model_i].primitives[prim_i].albedo.value(), debug_name, uploadManager);
                 }
             }
         }
+
+        views = uploadManager.bulkUploadTextures(meshManager.upload_task_graph, "Sponza ");
+        for (int model_i = 0; model_i < loader.modelData.size(); ++model_i) {
+            for (int prim_i = 0; prim_i < loader.modelData[model_i].primitives.size(); ++prim_i) {
+                ecs::getComponentManager<ManagedMesh>().addComponent(testEntities[model_i * loader.modelData.size() + prim_i], ManagedMesh(loader, model_i, prim_i, meshManager, drawGroup, renderer, { views[model_i * loader.modelData.size() + prim_i], sampler }));
+                ecs::getComponentManager<TransformComponent>().addComponent(testEntities[model_i * loader.modelData.size() + prim_i], TransformComponent(ecs::entityManager, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.01f)));
+            }
+        }
     }
+
+    // int grid_size = 5;
+	// float spacing = 0.08f;
+    
+    //{
+
+    //    for (int x = 0; x < grid_size; ++x) {
+    //        for (int y = 0; y < grid_size; ++y) {
+    //            for (int z = 0; z < grid_size; ++z) {
+    //                glm::vec3 position = glm::vec3(
+    //                    (x - grid_size / 2) * spacing,
+    //                    (y - grid_size / 2) * spacing,
+    //                    (z - grid_size / 2) * spacing
+    //                );
+    //                int cubeIndex = x * grid_size * grid_size + y * grid_size + z; // Unique speed per instance
+    //                
+    //                if (cubeIndex != 0) {
+    //                    testEntities.push_back(EntityManager::createEntity());
+    //                    ecs::getComponent<ManagedMesh>(testEntities[0])->instantiate(testEntities[cubeIndex], meshComponenetManager, { view1, sampler });
+    //                    ecs::getComponentManager<TransformComponent>().addComponent(testEntities[cubeIndex], TransformComponent(ecs::entityManager, position, glm::vec3(0.0f), glm::vec3(1.0f)));
+    //                } else {
+    //                    ecs::getComponent<TransformComponent>(testEntities[0])->setPosition(position);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 
     std::vector<DrawGroup> drawGroups;
 
     drawGroups.push_back(drawGroup);
     renderer.drawGroups.push_back(drawGroup);
 
+    meshManager.submit_upload_task_graph();
     renderer.submit_task_graph();
 
     Camera camera;
@@ -172,29 +183,30 @@ int init() {
         renderer.startFrame(camera);
 
         // ------------------------------------------------------ Goofy ahh test stuff ------------------------------------------------------
-        for (int x = 0; x < grid_size; ++x) {
-            for (int y = 0; y < grid_size; ++y) {
-                for (int z = 0; z < grid_size; ++z) {
-                    glm::vec3 position = glm::vec3(
-                        (x - grid_size / 2) * spacing,
-                        (y - grid_size / 2) * spacing,
-                        (z - grid_size / 2) * spacing
-                    );
-                    int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
-                    float speed = 0.04f * static_cast<float>(cubeIndex); // Unique speed per instance
-                    float angle = current_time * speed;
-                    ecs::getComponent<TransformComponent>(avocadoEntities[cubeIndex])->setRotation(glm::vec3(0.0f, angle, 0.0f));
-                }
-            }
-        }
+        //for (int x = 0; x < grid_size; ++x) {
+        //    for (int y = 0; y < grid_size; ++y) {
+        //        for (int z = 0; z < grid_size; ++z) {
+        //            glm::vec3 position = glm::vec3(
+        //                (x - grid_size / 2) * spacing,
+        //                (y - grid_size / 2) * spacing,
+        //                (z - grid_size / 2) * spacing
+        //            );
+        //            int cubeIndex = x * grid_size * grid_size + y * grid_size + z;
+        //            float speed = 0.04f * static_cast<float>(cubeIndex); // Unique speed per instance
+        //            float angle = current_time * speed;
+        //            ecs::getComponent<TransformComponent>(testEntities[cubeIndex])->setRotation(glm::vec3(0.0f, angle, 0.0f));
+        //        }
+        //    }
+        //}
         // ------------------------------------------------------- Goofy ahh test stuff ------------------------------------------------------
         ecs::updateSystems();
 
         renderer.endFrame();
     }
 
-    texture1.cleanup();
-    //texture2.cleanup();
+    for (auto& texture : textures) {
+        texture->cleanup();
+    }
 
     device.destroy_sampler(sampler);
 

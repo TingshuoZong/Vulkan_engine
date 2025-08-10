@@ -7,6 +7,8 @@ public:
     daxa::Device& device;
     daxa::TaskGraph upload_task_graph;
 
+    int meshIndex = -1;
+
     explicit MeshManager(daxa::Device& device);
 
     std::weak_ptr<DrawableMesh> add_mesh(const std::string& name, size_t VertexCount, size_t IndexCount);
@@ -17,11 +19,10 @@ public:
     }
 
     inline void upload_mesh_data_task(
-        const int mesh_index,
         daxa::TaskGraph& tg,
         const std::vector<Vertex>& vertex_data,
         const std::vector<uint32_t>& index_data) const {
-        meshes[mesh_index]->upload_mesh_data_task(tg, vertex_data, index_data);
+        meshes[meshIndex]->upload_mesh_data_task(tg, vertex_data, index_data);
     }
 
     inline void submit_upload_task_graph() {
@@ -29,7 +30,7 @@ public:
         upload_task_graph.complete({});
         upload_task_graph.execute({});
     }
-public:
+
     std::vector<std::shared_ptr<DrawableMesh>> meshes;
 };
 
@@ -43,6 +44,7 @@ inline MeshManager::MeshManager(daxa::Device &device)
 }
 
 inline std::weak_ptr<DrawableMesh> MeshManager::add_mesh(const std::string& name, size_t VertexCount, size_t IndexCount) {
+    meshIndex++;
     meshes.push_back(std::make_shared<DrawableMesh>(device, VertexCount, IndexCount, name));
     return meshes.back();
 }

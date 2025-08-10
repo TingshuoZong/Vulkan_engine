@@ -11,6 +11,10 @@ constexpr size_t MAX_INSTANCE_COUNT = 1024;
 struct DrawableMesh {
     daxa::Device* device = nullptr;
 
+    // size_t vertex_offset;
+    // size_t index_offset;
+    // size_t instance_offset;
+
     daxa::BufferId vertex_buffer_id;
     daxa::BufferId index_buffer_id;
     daxa::TaskBuffer task_vertex_buffer;
@@ -18,6 +22,7 @@ struct DrawableMesh {
 
     uint32_t vertex_count;
     uint32_t index_count;
+    // uint32_t instance_count;
 
     daxa::BufferId instance_buffer_id;
     daxa::TaskBuffer task_instance_buffer;

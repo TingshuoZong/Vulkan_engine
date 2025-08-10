@@ -10,6 +10,24 @@
 #include <string>
 constexpr const char* TEXTURE_PATH = "C:/dev/Engine_project/assets/textures/";
 
+struct UploadData {
+    daxa::TaskBuffer task_texture_staging;
+    daxa::TaskImage task_texture_image;
+    daxa::ImageId image;
+
+    uint32_t width;
+    uint32_t height;
+};
+
+class BulkTextureUploadManager {
+public:
+    void submitUpload(const UploadData& uploadData) { uploads.push_back(uploadData); }
+    std::vector <daxa::ImageViewId> bulkUploadTextures(daxa::TaskGraph& taskGraph, const std::string& name);
+private:
+    std::vector<UploadData> uploads;
+    std::vector<daxa::ImageViewId> views;
+};
+
 struct TextureHandle {
     int width;
     int height;
@@ -29,11 +47,11 @@ struct TextureHandle {
     // TODO: create a state handler to handle: steraming from disc -> compressed in cpu ram -> decompressed and uploaded into vram
     // TODO: create an abstraction to remove from vram and uncache from cpu ram
 
-    TextureHandle(daxa::Device& device);
-	void cleanup();
+    explicit TextureHandle(daxa::Device& device);
+	void cleanup() const;
 
-    void stream_texture_from_memory(std::string fileName);
-    void stream_texture_from_data(const tinygltf::Image& gltf_image, std::string debug_name);
-    inline void load_textures_into_buffers(const stbi_uc* pixels, uint32_t size_bytes);
-    daxa::ImageViewId load_texture(daxa::TaskGraph& loop_task_graph);
+    void stream_texture_from_memory(const std::string& fileName, const std::string &debug_name, BulkTextureUploadManager& manager);
+    void stream_texture_from_data(const tinygltf::Image& gltf_image, std::string debug_name, BulkTextureUploadManager& manager);
+    inline void load_textures_into_buffers(const stbi_uc* pixels, uint32_t size_bytes, BulkTextureUploadManager& manager);
+    daxa::ImageViewId load_texture(daxa::TaskGraph& task_graph);
 };

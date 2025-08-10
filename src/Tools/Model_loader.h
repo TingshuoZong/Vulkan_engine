@@ -10,19 +10,24 @@ struct ParsedPrimitive {
     std::vector<uint32_t> indices;
     std::size_t vertexCount;
     std::size_t indexCount;
+
+    std::optional<tinygltf::Image> albedo;
+};
+
+struct ParsedMesh {
+    std::vector<ParsedPrimitive> primitives;
 };
 
 class GLTF_Loader {
 public:
     GLTF_Loader() {}
 
-    ParsedPrimitive getModelData(int meshNo) { return modelData[meshNo]; }
+    ParsedPrimitive getModelData(int meshNo, int primitiveNo) { return modelData[meshNo].primitives[primitiveNo]; }
 
     void OpenFile(const std::string& path);
     void LoadModel();
 
-    std::vector<ParsedPrimitive> modelData;
-    std::optional<tinygltf::Image> albedo;
+    std::vector<ParsedMesh> modelData;
 
     std::string path;
 private:

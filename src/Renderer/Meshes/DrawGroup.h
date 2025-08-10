@@ -14,6 +14,17 @@ struct DrawGroup {
 
 	daxa::Device& device;
 
+	// daxa::BufferId vertex_buffer_id;
+	// daxa::BufferId index_buffer_id;
+	// daxa::BufferId instance_buffer_id;
+	//
+	// daxa::TaskBuffer task_vertex_buffer;
+	// daxa::TaskBuffer task_index_buffer;
+	// daxa::TaskBuffer task_instance_buffer;
+	//
+	// uint32_t total_vertex_count;
+	// uint32_t total_index_count;
+
 	DrawGroup(daxa::Device& device, const std::shared_ptr<daxa::RasterPipeline> &pipeline, std::string name);
 	void cleanup();
 
@@ -22,10 +33,10 @@ struct DrawGroup {
 	void add_mesh_instance(uint32_t mesh_index, PerInstanceData data);
 
 	inline void use_in_loop_task_graph(uint32_t mesh_index, daxa::TaskGraph& loop_task_graph) {
-        loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_vertex_buffer);
-        loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_index_buffer);
-        loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_instance_buffer);
-    };
+	    loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_vertex_buffer);
+	    loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_index_buffer);
+            loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_instance_buffer);
+        };
 
 private:
 

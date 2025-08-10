@@ -20,27 +20,30 @@ void GLTF_Loader::OpenFile(const std::string& path) {
 
 void GLTF_Loader::LoadModel() {
     for (const auto& mesh : model.meshes) {
+        ParsedMesh parsedMesh;
+
         int texture_index = -1;
-        if (mesh.primitives[0].material >= 0) {
+        /*if (mesh.primitives[0].material >= 0) {
             const auto& material = model.materials[mesh.primitives[0].material];
             if (material.values.contains("baseColorTexture")) {
                 texture_index = material.values.at("baseColorTexture").TextureIndex();
                 const auto& image = model.images[model.textures[texture_index].source];
-                albedo = image;
+                parsedMesh.albedo = image;
             }
-        }
+        }*/
 
         for (const auto& primitive : mesh.primitives) {
+            ParsedPrimitive parsedPirimitive;
+
             // Check if model contains multiple textures
             if (primitive.material >= 0) {
-                const auto& this_material = model.materials[primitive.material];
-                if (this_material.values.contains("baseColorTexture")) {
-                     if (this_material.values.at("baseColorTexture").TextureIndex() != texture_index) {
-                         std::cerr << "Warning: Mesh has multiple textures, loading first one\n";
-                     }
+                const auto& material = model.materials[primitive.material];
+                if (material.values.contains("baseColorTexture")) {
+                    texture_index = material.values.at("baseColorTexture").TextureIndex();
+                    const auto& image = model.images[model.textures[texture_index].source];
+                    parsedPirimitive.albedo = image;
                 }
             }
-            ParsedPrimitive parsed;
 
             // === POSITION ===
             const auto& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
@@ -79,7 +82,7 @@ void GLTF_Loader::LoadModel() {
                     v.uv = {0.0f, 0.0f};
                 }
 
-                parsed.vertices.push_back(v);
+                parsedPirimitive.vertices.push_back(v);
             }
 
             // === INDICES ===
@@ -101,14 +104,16 @@ void GLTF_Loader::LoadModel() {
                             idx = reinterpret_cast<const uint32_t*>(dataPtr)[i]; break;
                         default: throw std::runtime_error("Unsupported index component type");
                     }
-                    parsed.indices.push_back(idx);
+                    parsedPirimitive.indices.push_back(idx);
                 }
                 indexCount = idxAccessor.count;
             }
-            parsed.vertexCount = vertexCount;
-            parsed.indexCount = indexCount;
+            parsedPirimitive.vertexCount = vertexCount;
+            parsedPirimitive.indexCount = indexCount;
 
-            modelData.push_back(std::move(parsed));
+            parsedMesh.primitives.push_back(std::move(parsedPirimitive));
         }
+
+        modelData.push_back(parsedMesh);
     }
 }

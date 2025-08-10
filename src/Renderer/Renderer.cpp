@@ -54,7 +54,6 @@ void Renderer::draw_mesh_task(
         .attachments = attachments,
         .task = [=](const daxa::TaskInterface &ti) {
             auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
-
             daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
                 .color_attachments = std::array{
                     daxa::RenderAttachmentInfo{
@@ -85,7 +84,7 @@ void Renderer::draw_mesh_task(
                     .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
                     .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_instance_buffer).ids[0]).value(),
                 });
-
+                
                 render_recorder.draw_indexed({
                     .index_count = drawableMesh.lock()->index_count,
                     .instance_count = static_cast<uint32_t>(drawableMesh.lock()->instance_data.size()),
@@ -111,7 +110,7 @@ Renderer::Renderer(GLFW_Window::AppWindow& window, daxa::Device& device, daxa::I
 
     swapchain = device.create_swapchain({
         .native_window = window.get_native_handle(),
-        .native_window_platform = window.get_native_platform(),
+        .native_window_platform = GLFW_Window::AppWindow::get_native_platform(),
         .present_mode = daxa::PresentMode::FIFO,
         .image_usage = daxa::ImageUsageFlagBits::TRANSFER_DST,
         .name = "swapchain",
@@ -203,7 +202,7 @@ void Renderer::startFrame(const Camera& camera) {
         task_z_buffer.set_images({ .images = std::span{&z_buffer_id, 1} });
     }
 
-    float aspect_ratio = static_cast<float>(window.width) / window.height;
+    float aspect_ratio = static_cast<float>(window.width) / static_cast<float>(window.height);
     update_uniform_buffer(device, uniform_buffer_id, camera, aspect_ratio);
 }
 

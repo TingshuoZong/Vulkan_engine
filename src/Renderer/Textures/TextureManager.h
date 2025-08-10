@@ -15,9 +15,9 @@ public:
     TextureManager(daxa::Device& device, daxa::TaskGraph& loop_task_graph)
         : device(device), loop_task_graph(loop_task_graph) {}
 
-    inline void stream_texture_from_memory(std::string fileName) {
+    inline void stream_texture_from_memory(std::string fileName, std::string debug_name) {
         textures.push_back(TextureHandle(device));
-        textures[textures.size() - 1].stream_texture_from_memory(fileName);
+        textures[textures.size() - 1].stream_texture_from_memory(fileName, debug_name);
         views.push_back(textures[textures.size() - 1].load_texture(loop_task_graph));
     }
     inline void stream_texture_from_data(const tinygltf::Image& gltf_image, std::string debug_name) {

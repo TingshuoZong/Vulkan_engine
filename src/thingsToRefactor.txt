@@ -1,0 +1,12 @@
+in case anyone ever finds this in the github version history: I am stupid and forget things and is also too stupid/lazy to use github porjects though I porbably should instead of spamming TODOs
+
+In the transform_system the updatePerInstanceData
+In the DrawableMesh it no longer keeps its own buffers
+In the Renderer change the vertex start and index start values
+(think about using multi-draw indirect rendering and make sure I don't stupidly archtecture it so its incompatable)
+As always fix whatever test code in Engine.cpp
+Purge the actual textures from cpu ram (the actual gltf binary is only 9mb for sponza so it memory usage shouldn't be too bad)
+
+In DrawGroup make the big buffers
+-make alloc and realloc for the big buffers
+-(keep cpu side copies of vertex, index and instance data)

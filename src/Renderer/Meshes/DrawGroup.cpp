@@ -13,7 +13,11 @@ void DrawGroup::add_mesh_instance(uint32_t mesh_index, PerInstanceData data) {
 }
 
 void DrawGroup::cleanup() {
-	for (auto& mesh : meshes) {
-		mesh.lock()->cleanup();
-	}
+    // device.destroy(vertex_buffer_id);
+    // device.destroy(index_buffer_id);
+    // device.destroy(instance_buffer_id);
+
+    for (auto& mesh : meshes) {
+	mesh.lock()->cleanup();
+    }
 }
