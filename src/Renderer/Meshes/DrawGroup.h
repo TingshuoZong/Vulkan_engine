@@ -31,7 +31,7 @@ struct DrawGroup {
 	DrawGroup(daxa::Device& device, const std::shared_ptr<daxa::RasterPipeline> &pipeline, std::string name);
 	void cleanup();
 
-	/*inline void allocBuffers(daxa::Device& device) {
+	inline void allocBuffers(daxa::Device& device) {
 		vertex_buffer_id = device.create_buffer({
 			.size = total_vertex_count * sizeof(Vertex),
 			.name = name + " vertex buffer"
@@ -43,9 +43,9 @@ struct DrawGroup {
 		});
 
 		index_buffer_id = device.create_buffer({
-				.size = total_index_count * sizeof(uint32_t),
-				.name = name + " index buffer"
-			});
+			.size = total_index_count * sizeof(uint32_t),
+			.name = name + " index buffer"
+		});
 
 		task_index_buffer = daxa::TaskBuffer({
 			.initial_buffers = {.buffers = std::span{&index_buffer_id, 1}},
@@ -53,8 +53,8 @@ struct DrawGroup {
 		});
 
 		instance_buffer_id = device.create_buffer({
-			.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
 			.size = MAX_DRAWGROUP_INSTANCE_COUNT * sizeof(PerInstanceData),
+			.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,			
 			.name = name + " instance SSBO"
 		});
 
@@ -62,7 +62,7 @@ struct DrawGroup {
 			.initial_buffers = {.buffers = std::span{&instance_buffer_id, 1}},
 			.name = name + " task instance SSBO"
 		});
-	}*/
+	}
 
 	inline void register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph);
 
