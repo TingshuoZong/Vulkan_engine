@@ -2,6 +2,8 @@
 
 This is just a toy project I am working on to learn C++ and graphics programming.
 
+**Note:** There is currently a but that glm is marked as a vcpkg managed package whereas it should be vendored so to build you must supply your own glm inside /lib/glm
+
 ## ECS
 
 The ECS is the main way game code will interact with the game engine, components such as `ManagedMesh` and `TransformComponent` allow for common functions such as rendering objects.
