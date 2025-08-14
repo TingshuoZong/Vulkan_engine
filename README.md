@@ -2,7 +2,7 @@
 
 This is just a toy project I am working on to learn C++ and graphics programming.
 
-**Note:** There is currently a but that glm is marked as a vcpkg managed package whereas it should be vendored so to build you must supply your own glm inside /lib/glm
+**Note:** There is currently a bug that glm is marked as a subrepository but it should be vendored so to build you must supply your own glm inside /lib/glm
 
 ## ECS
 
