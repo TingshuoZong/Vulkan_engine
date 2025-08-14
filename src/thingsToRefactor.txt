@@ -10,3 +10,5 @@ Purge the actual textures from cpu ram (the actual gltf binary is only 9mb for s
 In DrawGroup make the big buffers
 -make alloc and realloc for the big buffers
 -(keep cpu side copies of vertex, index and instance data)
+
+DrawableMesh should be the thing caching the mesh data not the loader!!!

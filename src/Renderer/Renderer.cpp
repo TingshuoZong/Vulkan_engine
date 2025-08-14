@@ -8,6 +8,11 @@ UniformBufferObject ubo{
         .proj = glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f),
 };
 
+void Renderer::registerDrawGroup(DrawGroup&& drawGroup) {
+    drawGroups.push_back(drawGroup);
+    drawGroups.back().drawGroupIndex = drawGroups.size() - 1;
+}
+
 void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo) {
     tg.add_task({
         .attachments = {
@@ -32,10 +37,78 @@ void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskB
         });
 }
 
+// void Renderer::draw_mesh_task(
+//     const DrawGroup& drawGroup,
+//     const bool clear
+// ) {
+//     std::vector<daxa::TaskAttachmentInfo> attachments;
+//
+//     // Shared resources
+//     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, task_uniform_buffer));
+//     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_swapchain_image));
+//     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_z_buffer));
+//
+//     // Add each drawable's vertex/index/instance buffers
+//     for (auto& drawable : drawGroup.meshes) {
+//         attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_vertex_buffer));
+//         attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_instance_buffer));
+//         attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.lock()->task_index_buffer));
+//     }
+//
+//     loop_task_graph.add_task({
+//         .attachments = attachments,
+//         .task = [=](const daxa::TaskInterface &ti) {
+//             auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
+//             daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
+//                 .color_attachments = std::array{
+//                     daxa::RenderAttachmentInfo{
+//                         .image_view = ti.get(task_swapchain_image).view_ids[0],
+//                         .load_op = clear ? daxa::AttachmentLoadOp::CLEAR : daxa::AttachmentLoadOp::LOAD,
+//                         .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
+//                     },
+//                 },
+//                 .depth_attachment = daxa::RenderAttachmentInfo{
+//                     .image_view = ti.get(task_z_buffer).view_ids[0],
+//                     .load_op = clear ? daxa::AttachmentLoadOp::CLEAR : daxa::AttachmentLoadOp::LOAD,
+//                     .clear_value = daxa::DepthValue{1.0f, 0},
+//                 },
+//                 .render_area = {.width = size.x, .height = size.y},
+//             });
+//
+//             render_recorder.set_pipeline(*drawGroup.pipeline);
+//
+//             for (auto const& drawableMesh : drawGroup.meshes) {
+//                 render_recorder.set_index_buffer({
+//                     .id = ti.get(drawableMesh.lock()->task_index_buffer).ids[0],
+//                     .offset = 0,
+//                     .index_type = daxa::IndexType::uint32,
+//                 });
+//
+//                 render_recorder.push_constant(PushConstant{
+//                     .vertex_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_vertex_buffer).ids[0]).value(),
+//                     .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
+//                     .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_instance_buffer).ids[0]).value(),
+//                 });
+//
+//                 render_recorder.draw_indexed({
+//                     .index_count = drawableMesh.lock()->index_count,
+//                     .instance_count = static_cast<uint32_t>(drawableMesh.lock()->instance_data.size()),
+//                 });
+//             }
+//             ti.recorder = std::move(render_recorder).end_renderpass();
+//         },
+//         .name = "draw mesh",
+//     });
+// }
+
 void Renderer::draw_mesh_task(
     const DrawGroup& drawGroup,
     const bool clear
 ) {
+    loop_task_graph.use_persistent_buffer(drawGroup.task_vertex_buffer);
+    loop_task_graph.use_persistent_buffer(drawGroup.task_index_buffer);
+    loop_task_graph.use_persistent_buffer(drawGroup.task_instance_buffer);
+
     std::vector<daxa::TaskAttachmentInfo> attachments;
 
     // Shared resources
@@ -44,15 +117,13 @@ void Renderer::draw_mesh_task(
     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_z_buffer));
 
     // Add each drawable's vertex/index/instance buffers
-    for (auto& drawable : drawGroup.meshes) {
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_vertex_buffer));
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_instance_buffer));
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.lock()->task_index_buffer));
-    }
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_vertex_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_instance_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_index_buffer));
 
     loop_task_graph.add_task({
         .attachments = attachments,
-        .task = [=](const daxa::TaskInterface &ti) {
+        .task = [=](const daxa::TaskInterface& ti) {
             auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
             daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
                 .color_attachments = std::array{
@@ -74,26 +145,29 @@ void Renderer::draw_mesh_task(
 
             for (auto const& drawableMesh : drawGroup.meshes) {
                 render_recorder.set_index_buffer({
-                    .id = ti.get(drawableMesh.lock()->task_index_buffer).ids[0],
+                    .id = ti.get(drawGroup.task_index_buffer).ids[0],
                     .offset = 0,
                     .index_type = daxa::IndexType::uint32,
                 });
 
                 render_recorder.push_constant(PushConstant{
-                    .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_vertex_buffer).ids[0]).value(),
+                    .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
                     .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
-                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_instance_buffer).ids[0]).value(),
+                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
                 });
-                
+
                 render_recorder.draw_indexed({
                     .index_count = drawableMesh.lock()->index_count,
-                    .instance_count = static_cast<uint32_t>(drawableMesh.lock()->instance_data.size()),
+                    .instance_count = static_cast<std::uint32_t>(drawableMesh.lock()->instance_data.size()),
+                    .first_index = drawableMesh.lock()->index_offset,
+                    .vertex_offset = static_cast<std::int32_t>(drawableMesh.lock()->vertex_offset),
+                    .first_instance = drawableMesh.lock()->instance_offset
                 });
             }
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",
-    });
+        });
 }
 
 void Renderer::update_uniform_buffer(const daxa::Device& device, const daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {

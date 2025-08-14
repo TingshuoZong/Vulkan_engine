@@ -23,14 +23,7 @@ void GLTF_Loader::LoadModel() {
         ParsedMesh parsedMesh;
 
         int texture_index = -1;
-        /*if (mesh.primitives[0].material >= 0) {
-            const auto& material = model.materials[mesh.primitives[0].material];
-            if (material.values.contains("baseColorTexture")) {
-                texture_index = material.values.at("baseColorTexture").TextureIndex();
-                const auto& image = model.images[model.textures[texture_index].source];
-                parsedMesh.albedo = image;
-            }
-        }*/
+
 
         for (const auto& primitive : mesh.primitives) {
             ParsedPrimitive parsedPirimitive;

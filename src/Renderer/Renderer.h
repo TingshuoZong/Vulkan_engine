@@ -43,6 +43,8 @@ struct Renderer {
 
     void draw_mesh_task(const DrawGroup& drawGroup, bool clear = false);
 
+    void registerDrawGroup(DrawGroup&& drawGroup);
+
     static void update_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
 
     void init();
