@@ -43,6 +43,7 @@ void Renderer::draw_mesh_task(
 ) {
     loop_task_graph.use_persistent_buffer(drawGroup.task_vertex_buffer);
     loop_task_graph.use_persistent_buffer(drawGroup.task_index_buffer);
+    loop_task_graph.use_persistent_buffer(drawGroup.task_command_buffer);
     loop_task_graph.use_persistent_buffer(drawGroup.task_instance_buffer);
 
     std::vector<daxa::TaskAttachmentInfo> attachments;
@@ -55,6 +56,7 @@ void Renderer::draw_mesh_task(
     // Add each drawable's vertex/index/instance buffers
     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_vertex_buffer));
     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_instance_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_command_buffer));
     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_index_buffer));
 
     loop_task_graph.add_task({
@@ -91,15 +93,14 @@ void Renderer::draw_mesh_task(
                 .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
             });
 
-            for (auto const& drawableMesh : drawGroup.meshes) {
-                render_recorder.draw_indexed({
-                    .index_count = drawableMesh.lock()->index_count,
-                    .instance_count = static_cast<std::uint32_t>(drawableMesh.lock()->instance_data.size()),
-                    .first_index = drawableMesh.lock()->index_offset,
-                    .vertex_offset = static_cast<std::int32_t>(drawableMesh.lock()->vertex_offset),
-                    .first_instance = drawableMesh.lock()->instance_offset
-                });
-            }
+            render_recorder.draw_indirect({
+                .draw_command_buffer = ti.get(drawGroup.task_command_buffer).ids[0],
+                .indirect_buffer_offset = 0,
+                .draw_count = static_cast<uint32_t>(drawGroup.meshes.size()),
+                .draw_command_stride = sizeof(VkDrawIndexedIndirectCommand),
+                .is_indexed = true
+            });
+
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",

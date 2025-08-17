@@ -4,6 +4,7 @@
 void DrawGroup::cleanup() {
      device.destroy(vertex_buffer_id);
      device.destroy(index_buffer_id);
+	 device.destroy(command_buffer_id);
      device.destroy(instance_buffer_id);
 }
 
