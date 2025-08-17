@@ -4,6 +4,17 @@ This is just a toy project I am working on to learn C++ and graphics programming
 
 **Note:** There is currently a bug that glm is marked as a subrepository but it should be vendored so to build you must supply your own glm inside /lib/glm
 
+## Install/Build
+
+You can use any generator you want (note for Visual Stuido you must have at least 2022 installed for daxa), in the example it is using Ninja
+
+```
+git clone https://github.com/TingshuoZong/Vulkan_engine.git
+mkdir .build && cd .build
+cmake .. -G "Ninja"
+ninja
+```
+
 ## ECS
 
 The ECS is the main way game code will interact with the game engine, components such as `ManagedMesh` and `TransformComponent` allow for common functions such as rendering objects.
