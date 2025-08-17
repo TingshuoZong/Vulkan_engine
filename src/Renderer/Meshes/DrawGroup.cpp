@@ -28,6 +28,16 @@ void DrawGroup::allocBuffers() {
 		.name = name + " task index buffer"
 		});
 
+	command_buffer_id = device.create_buffer({
+		.size = MAX_DRAWGROUP_MESH_COUNT * sizeof(VkDrawIndexedIndirectCommand),
+		.name = name + " command buffer"
+		});
+
+	task_command_buffer = daxa::TaskBuffer({
+		.initial_buffers = {.buffers = std::span{&command_buffer_id, 1}},
+		.name = name + " task command buffer"
+		});
+
 	instance_buffer_id = device.create_buffer({
 		.size = MAX_DRAWGROUP_INSTANCE_COUNT * sizeof(PerInstanceData),
 		.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
@@ -84,6 +94,18 @@ void DrawGroup::loadBufferInfo(
 
 	if (currentInstanceCount > MAX_DRAWGROUP_INSTANCE_COUNT)
 	   throw std::runtime_error("Error: DrawGroup instance count exceeded, either bind less instances to the drawgroup or increase MAX_DRAWGROUP_INSTANCE_COUNT");
+	
+	indirectCommands.reserve(meshes.size());
+
+	for (auto& drawableMesh : meshes) {
+		indirectCommands.push_back(VkDrawIndexedIndirectCommand{
+			.indexCount = drawableMesh.lock()->index_count,
+			.instanceCount = static_cast<std::uint32_t>(drawableMesh.lock()->instance_data.size()),
+			.firstIndex = drawableMesh.lock()->index_offset,
+			.vertexOffset = static_cast<std::int32_t>(drawableMesh.lock()->vertex_offset),
+			.firstInstance = drawableMesh.lock()->instance_offset
+		});
+	}
 }
 
 void DrawGroup::uploadBufferData(
@@ -96,6 +118,7 @@ void DrawGroup::uploadBufferData(
 		.attachments = {
 			daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, this->task_vertex_buffer),
 			daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, this->task_index_buffer),
+			daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, this->task_command_buffer)
 		},
 		.task = [=, this](daxa::TaskInterface ti) {
 			auto vertex_staging = ti.device.create_buffer({
@@ -126,6 +149,21 @@ void DrawGroup::uploadBufferData(
 				.src_buffer = index_staging,
 				.dst_buffer = ti.get(this->task_index_buffer).ids[0],
 				.size = indexStagingArr.size() * sizeof(uint32_t),
+			});
+
+			auto command_staging = ti.device.create_buffer({
+				.size = indirectCommands.size() * sizeof(VkDrawIndexedIndirectCommand),
+				.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+				.name = this->name + ">" + name + "command staging buffer",
+			});
+			ti.recorder.destroy_buffer_deferred(command_staging);
+			auto* command_ptr = ti.device.buffer_host_address_as<VkDrawIndexedIndirectCommand>(command_staging).value();
+			std::memcpy(command_ptr, indirectCommands.data(), indirectCommands.size() * sizeof(VkDrawIndexedIndirectCommand));
+
+			ti.recorder.copy_buffer_to_buffer({
+				.src_buffer = command_staging,
+				.dst_buffer = ti.get(this->task_command_buffer).ids[0],
+				.size = indirectCommands.size() * sizeof(VkDrawIndexedIndirectCommand)
 			});
 		},
 		.name = this->name + ">" + name + " upload mesh data",

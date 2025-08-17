@@ -15,7 +15,7 @@
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
 
-constexpr const char* GLOBAL_SHADER_PATH = "C:/dev/Engine_project/shaders";
+constexpr const char* GLOBAL_SHADER_PATH = "C:/dev/Vulkan_engine/shaders";
 constexpr float V_FOV = 60.0f;
 
 struct Renderer {

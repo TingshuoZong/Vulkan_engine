@@ -10,6 +10,7 @@
 #include <vulkan/vulkan.h>
 
 constexpr size_t MAX_DRAWGROUP_INSTANCE_COUNT = 1024;
+constexpr size_t MAX_DRAWGROUP_MESH_COUNT = 1024;
 
 struct DrawGroup {
 	std::string name;
@@ -24,10 +25,12 @@ struct DrawGroup {
 	daxa::BufferId vertex_buffer_id;
 	daxa::BufferId index_buffer_id;
 	daxa::BufferId instance_buffer_id;
+	daxa::BufferId command_buffer_id;
 
 	daxa::TaskBuffer task_vertex_buffer;
 	daxa::TaskBuffer task_index_buffer;
 	daxa::TaskBuffer task_instance_buffer;
+	daxa::TaskBuffer task_command_buffer;
 
 	std::vector<VkDrawIndexedIndirectCommand> indirectCommands;
 
@@ -62,6 +65,7 @@ struct DrawGroup {
 
 		tg.use_persistent_buffer(task_vertex_buffer);
 		tg.use_persistent_buffer(task_index_buffer);
+		tg.use_persistent_buffer(task_command_buffer);
 		tg.use_persistent_buffer(task_instance_buffer);
 
 		uploadBufferData(tg, vertexStagingArr, indexStagingArr, instanceStagingArr);

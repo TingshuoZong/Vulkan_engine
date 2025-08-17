@@ -79,19 +79,19 @@ void Renderer::draw_mesh_task(
 
             render_recorder.set_pipeline(*drawGroup.pipeline);
 
+            render_recorder.set_index_buffer({
+                .id = ti.get(drawGroup.task_index_buffer).ids[0],
+                .offset = 0,
+                .index_type = daxa::IndexType::uint32,
+            });
+
+            render_recorder.push_constant(PushConstant{
+                .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
+                .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
+                .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
+            });
+
             for (auto const& drawableMesh : drawGroup.meshes) {
-                render_recorder.set_index_buffer({
-                    .id = ti.get(drawGroup.task_index_buffer).ids[0],
-                    .offset = 0,
-                    .index_type = daxa::IndexType::uint32,
-                });
-
-                render_recorder.push_constant(PushConstant{
-                    .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
-                    .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
-                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
-                });
-
                 render_recorder.draw_indexed({
                     .index_count = drawableMesh.lock()->index_count,
                     .instance_count = static_cast<std::uint32_t>(drawableMesh.lock()->instance_data.size()),
@@ -103,7 +103,7 @@ void Renderer::draw_mesh_task(
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",
-        });
+    });
 }
 
 void Renderer::update_uniform_buffer(const daxa::Device& device, const daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
