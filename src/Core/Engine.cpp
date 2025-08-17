@@ -97,7 +97,7 @@ int init() {
 
     {
         GLTF_Loader loader;
-        loader.OpenFile("C:/dev/Vulkan_engine/assets/Sponza_glTF/Sponza.gltf");    //"C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf"
+        loader.OpenFile("C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf");    //"C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf"
         loader.LoadModel();
 
         for (int model_i = 0; model_i < loader.modelData.size(); ++model_i) {
