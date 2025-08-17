@@ -27,6 +27,8 @@ public:
     void OpenFile(const std::string& path);
     void LoadModel();
 
+    void purgeImages();
+
     std::vector<ParsedMesh> modelData;
 
     std::string path;

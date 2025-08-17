@@ -23,8 +23,7 @@ public:
         transformMessages.push(message);
     }
 
-    void processMessages() {
-        //if (!unprocessedMessages) return;
+    void processMessages() {;
         while (!transformMessages.empty()) {
             const auto& message = transformMessages.front();
             std::visit(
@@ -43,14 +42,9 @@ public:
     }
 
     inline void updatePerInstanceData() {
-        //if (meshesToUpdate.empty()) return;
         for (auto& mesh : meshesToUpdate) {
-            //std::cerr << "Need to reimplement accessing per-instance data\n";
             auto* ptr = device.buffer_host_address_as<PerInstanceData>(renderer.drawGroups[mesh->drawGroupIndex].instance_buffer_id).value();
             memcpy(ptr + mesh->instance_offset, mesh->instance_data.data(), mesh->instance_data.size() * sizeof(PerInstanceData));
-
-            //auto* ptr = device.buffer_host_address_as<PerInstanceData>(mesh->instance_buffer_id).value();
-            //memcpy(ptr, mesh->instance_data.data(), mesh->instance_data.size() * sizeof(PerInstanceData));
         }
         meshesToUpdate.clear();
     }

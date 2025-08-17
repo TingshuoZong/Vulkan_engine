@@ -7,6 +7,8 @@
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
 
+#include <vulkan/vulkan.h>
+
 constexpr size_t MAX_DRAWGROUP_INSTANCE_COUNT = 1024;
 
 struct DrawGroup {
@@ -26,6 +28,8 @@ struct DrawGroup {
 	daxa::TaskBuffer task_vertex_buffer;
 	daxa::TaskBuffer task_index_buffer;
 	daxa::TaskBuffer task_instance_buffer;
+
+	std::vector<VkDrawIndexedIndirectCommand> indirectCommands;
 
 	uint32_t total_vertex_count = 0;
 	uint32_t total_index_count = 0;
@@ -49,7 +53,7 @@ struct DrawGroup {
 		std::vector<PerInstanceData>& instanceStagingArr);
 
 	inline void uploadBuffers(daxa::TaskGraph& tg) {
-		std::vector<Vertex> vertexStagingArr;
+ 		std::vector<Vertex> vertexStagingArr;
 		std::vector<uint32_t> indexStagingArr;
 		std::vector<PerInstanceData> instanceStagingArr;
 
@@ -65,22 +69,11 @@ struct DrawGroup {
 
 	inline void register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph);
 
-//	void add_mesh_instance(uint32_t mesh_index, PerInstanceData data);
-
-//	inline void use_in_loop_task_graph(uint32_t mesh_index, daxa::TaskGraph& loop_task_graph) {
-//	    loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_vertex_buffer);
-//	    loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_index_buffer);
-//        loop_task_graph.use_persistent_buffer(meshes[mesh_index].lock()->task_instance_buffer);
-//    };
-
 private:
 
 };
 
-
-
 inline void DrawGroup::register_mesh(std::weak_ptr<DrawableMesh> drawableMesh, daxa::TaskGraph loop_task_graph) {
 	meshes.push_back(drawableMesh);
 	meshes.back().lock()->drawGroupIndex = drawGroupIndex;
-	//use_in_loop_task_graph(meshes.size() - 1, loop_task_graph);
 }

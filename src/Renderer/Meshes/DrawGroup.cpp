@@ -1,20 +1,10 @@
 #include "DrawGroup.h"
 
-//void DrawGroup::add_mesh_instance(uint32_t mesh_index, PerInstanceData data) {
-//    meshes[mesh_index].lock()->instance_data.push_back(data);
-//
-//    auto* ptr = device.buffer_host_address_as<PerInstanceData>(meshes[mesh_index].lock()->instance_buffer_id).value();
-//    memcpy(ptr, meshes[mesh_index].lock()->instance_data.data(), meshes[mesh_index].lock()->instance_data.size() * sizeof(PerInstanceData));
-//}
 
 void DrawGroup::cleanup() {
      device.destroy(vertex_buffer_id);
      device.destroy(index_buffer_id);
      device.destroy(instance_buffer_id);
-
-    /*for (auto& mesh : meshes) {
-		mesh.lock()->cleanup();
-    }*/
 }
 
 void DrawGroup::allocBuffers() {

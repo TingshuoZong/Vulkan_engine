@@ -17,6 +17,16 @@ void GLTF_Loader::OpenFile(const std::string& path) {
     this->path = path;
 }
 
+void GLTF_Loader::purgeImages() {
+    for (auto& model : modelData) {
+        for (auto& primitive : model.primitives) {
+            if (primitive.albedo.has_value()) {
+                primitive.albedo.value().image.clear();
+                primitive.albedo.value().image.shrink_to_fit();
+            }
+        }
+    }
+}
 
 void GLTF_Loader::LoadModel() {
     for (const auto& mesh : model.meshes) {
