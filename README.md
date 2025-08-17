@@ -8,12 +8,12 @@ This is just a toy project I am working on to learn C++ and graphics programming
 
 You can use any generator you want (note for Visual Stuido you must have at least 2022 installed for daxa), in the example it is using Ninja
 
-'''
+```
 git clone https://github.com/TingshuoZong/Vulkan_engine.git
 mkdir .build && cd .build
 cmake .. -G "Ninja"
 ninja
-'''
+```
 
 ## ECS
 
