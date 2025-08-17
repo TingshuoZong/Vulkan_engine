@@ -10,7 +10,7 @@ layout(location = 0) out daxa_f32vec2 v_uv;
 layout(location = 1) flat out int v_InstanceIndex;
 
 void main() {
-    Vertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
+    Vertex vert = deref(push.vertex_ptr[gl_VertexIndex]);
     PerInstanceData instData = deref(push.instance_buffer_ptr[gl_InstanceIndex]);
     UniformBufferObject ubo = deref(push.ubo_ptr);
 

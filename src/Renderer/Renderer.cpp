@@ -8,6 +8,11 @@ UniformBufferObject ubo{
         .proj = glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f),
 };
 
+void Renderer::registerDrawGroup(DrawGroup&& drawGroup) {
+    drawGroups.push_back(drawGroup);
+    drawGroups.back().drawGroupIndex = drawGroups.size() - 1;
+}
+
 void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo) {
     tg.add_task({
         .attachments = {
@@ -36,6 +41,11 @@ void Renderer::draw_mesh_task(
     const DrawGroup& drawGroup,
     const bool clear
 ) {
+    loop_task_graph.use_persistent_buffer(drawGroup.task_vertex_buffer);
+    loop_task_graph.use_persistent_buffer(drawGroup.task_index_buffer);
+    loop_task_graph.use_persistent_buffer(drawGroup.task_command_buffer);
+    loop_task_graph.use_persistent_buffer(drawGroup.task_instance_buffer);
+
     std::vector<daxa::TaskAttachmentInfo> attachments;
 
     // Shared resources
@@ -44,15 +54,14 @@ void Renderer::draw_mesh_task(
     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_z_buffer));
 
     // Add each drawable's vertex/index/instance buffers
-    for (auto& drawable : drawGroup.meshes) {
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_vertex_buffer));
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawable.lock()->task_instance_buffer));
-        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawable.lock()->task_index_buffer));
-    }
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_vertex_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_instance_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_command_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_index_buffer));
 
     loop_task_graph.add_task({
         .attachments = attachments,
-        .task = [=](const daxa::TaskInterface &ti) {
+        .task = [=](const daxa::TaskInterface& ti) {
             auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
             daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
                 .color_attachments = std::array{
@@ -72,24 +81,26 @@ void Renderer::draw_mesh_task(
 
             render_recorder.set_pipeline(*drawGroup.pipeline);
 
-            for (auto const& drawableMesh : drawGroup.meshes) {
-                render_recorder.set_index_buffer({
-                    .id = ti.get(drawableMesh.lock()->task_index_buffer).ids[0],
-                    .offset = 0,
-                    .index_type = daxa::IndexType::uint32,
-                });
+            render_recorder.set_index_buffer({
+                .id = ti.get(drawGroup.task_index_buffer).ids[0],
+                .offset = 0,
+                .index_type = daxa::IndexType::uint32,
+            });
 
-                render_recorder.push_constant(PushConstant{
-                    .my_vertex_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_vertex_buffer).ids[0]).value(),
-                    .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
-                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawableMesh.lock()->task_instance_buffer).ids[0]).value(),
-                });
-                
-                render_recorder.draw_indexed({
-                    .index_count = drawableMesh.lock()->index_count,
-                    .instance_count = static_cast<uint32_t>(drawableMesh.lock()->instance_data.size()),
-                });
-            }
+            render_recorder.push_constant(PushConstant{
+                .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
+                .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
+                .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
+            });
+
+            render_recorder.draw_indirect({
+                .draw_command_buffer = ti.get(drawGroup.task_command_buffer).ids[0],
+                .indirect_buffer_offset = 0,
+                .draw_count = static_cast<uint32_t>(drawGroup.meshes.size()),
+                .draw_command_stride = sizeof(VkDrawIndexedIndirectCommand),
+                .is_indexed = true
+            });
+
             ti.recorder = std::move(render_recorder).end_renderpass();
         },
         .name = "draw mesh",

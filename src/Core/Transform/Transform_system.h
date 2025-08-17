@@ -10,8 +10,8 @@
 
 class TransformSystem : public ISystem {
 public:
-    TransformSystem(daxa::Device& device, ComponentManager<ManagedMesh>& meshComponentManager)
-        : device(device), meshComponentManager(meshComponentManager) {}
+    TransformSystem(daxa::Device& device, Renderer& renderer, ComponentManager<ManagedMesh>& meshComponentManager)
+        : device(device), renderer(renderer), meshComponentManager(meshComponentManager) {}
 
     inline void update() {
         processMessages();
@@ -23,9 +23,7 @@ public:
         transformMessages.push(message);
     }
 
-    void processMessages() {
-        if (!unprocessedMessages) return;
-
+    void processMessages() {;
         while (!transformMessages.empty()) {
             const auto& message = transformMessages.front();
             std::visit(
@@ -44,10 +42,9 @@ public:
     }
 
     inline void updatePerInstanceData() {
-        if (meshesToUpdate.empty()) return;
         for (auto& mesh : meshesToUpdate) {
-            auto* ptr = device.buffer_host_address_as<PerInstanceData>(mesh->instance_buffer_id).value();
-            memcpy(ptr, mesh->instance_data.data(), mesh->instance_data.size() * sizeof(PerInstanceData));
+            auto* ptr = device.buffer_host_address_as<PerInstanceData>(renderer.drawGroups[mesh->drawGroupIndex].instance_buffer_id).value();
+            memcpy(ptr + mesh->instance_offset, mesh->instance_data.data(), mesh->instance_data.size() * sizeof(PerInstanceData));
         }
         meshesToUpdate.clear();
     }
@@ -55,6 +52,8 @@ private:
     bool unprocessedMessages = false;
 
     daxa::Device& device;
+    Renderer& renderer;
+
     ComponentManager<ManagedMesh>& meshComponentManager;
 
     std::queue<TransformMessage> transformMessages;

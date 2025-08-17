@@ -50,7 +50,7 @@ DAXA_DECL_BUFFER_PTR(UniformBufferObject)
 DAXA_DECL_BUFFER_PTR(PerInstanceData)
 
 struct PushConstant {
-    daxa_BufferPtr(Vertex) my_vertex_ptr;
+    daxa_BufferPtr(Vertex) vertex_ptr;
     daxa_BufferPtr(UniformBufferObject) ubo_ptr;
     daxa_BufferPtr(PerInstanceData) instance_buffer_ptr;
 };

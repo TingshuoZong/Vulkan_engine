@@ -81,6 +81,7 @@ int init() {
 // -----------------------------------------------------------------------------------------------------------------
     MeshManager meshManager(device);
     DrawGroup drawGroup(device, pipeline, "My DrawGroup");
+    renderer.registerDrawGroup(std::move(drawGroup));
 
     BulkTextureUploadManager uploadManager;
 
@@ -92,11 +93,11 @@ int init() {
     ecs::entityManager.registerComponentManager<ManagedMesh>();    
 
     ecs::entityManager.registerComponentManager<TransformComponent>();
-    ecs::entityManager.registerSystem<TransformSystem>(device, ecs::entityManager.getComponentManager<ManagedMesh>());
+    ecs::entityManager.registerSystem<TransformSystem>(device, renderer, ecs::entityManager.getComponentManager<ManagedMesh>());
 
     {
         GLTF_Loader loader;
-        loader.OpenFile("C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf");    //"C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf"
+        loader.OpenFile("C:/dev/Vulkan_engine/assets/Sponza_glTF/Sponza.gltf");    //"C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf"
         loader.LoadModel();
 
         for (int model_i = 0; model_i < loader.modelData.size(); ++model_i) {
@@ -114,7 +115,7 @@ int init() {
         views = uploadManager.bulkUploadTextures(meshManager.upload_task_graph, "Sponza ");
         for (int model_i = 0; model_i < loader.modelData.size(); ++model_i) {
             for (int prim_i = 0; prim_i < loader.modelData[model_i].primitives.size(); ++prim_i) {
-                ecs::getComponentManager<ManagedMesh>().addComponent(testEntities[model_i * loader.modelData.size() + prim_i], ManagedMesh(loader, model_i, prim_i, meshManager, drawGroup, renderer, { views[model_i * loader.modelData.size() + prim_i], sampler }));
+                ecs::getComponentManager<ManagedMesh>().addComponent(testEntities[model_i * loader.modelData.size() + prim_i], ManagedMesh(loader, model_i, prim_i, meshManager, renderer.drawGroups[0], renderer, {views[model_i * loader.modelData.size() + prim_i], sampler}));
                 ecs::getComponentManager<TransformComponent>().addComponent(testEntities[model_i * loader.modelData.size() + prim_i], TransformComponent(ecs::entityManager, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.01f)));
             }
         }
@@ -147,10 +148,8 @@ int init() {
     //    }
     //}
 
-    std::vector<DrawGroup> drawGroups;
 
-    drawGroups.push_back(drawGroup);
-    renderer.drawGroups.push_back(drawGroup);
+    renderer.drawGroups[0].uploadBuffers(meshManager.upload_task_graph);
 
     meshManager.submit_upload_task_graph();
     renderer.submit_task_graph();

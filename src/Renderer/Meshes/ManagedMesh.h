@@ -22,13 +22,15 @@ public:
     ManagedMesh(GLTF_Loader& loader, int meshNo, int primitiveNo, MeshManager& meshManager, DrawGroup& drawGroup, const Renderer& renderer, TextureData texture)
         : transform(), textures() {
         // Add a new mesh
-        mesh = meshManager.add_mesh(loader.path + std::to_string(meshNo) + std::to_string(primitiveNo),
-            loader.getModelData(meshNo, primitiveNo).vertexCount,
-            loader.getModelData(meshNo, primitiveNo).indexCount);
+        // mesh = meshManager.add_mesh(loader.path + std::to_string(meshNo) + std::to_string(primitiveNo),
+        //     loader.getModelData(meshNo, primitiveNo).vertexCount,
+        //     loader.getModelData(meshNo, primitiveNo).indexCount);
+        // 
+        // meshManager.upload_mesh_data_task(meshManager.upload_task_graph, 
+        //     loader.getModelData(meshNo, primitiveNo).vertices,
+        //     loader.getModelData(meshNo, primitiveNo).indices);
 
-        meshManager.upload_mesh_data_task(meshManager.upload_task_graph, 
-            loader.getModelData(meshNo, primitiveNo).vertices,
-            loader.getModelData(meshNo, primitiveNo).indices);
+        mesh = meshManager.add_mesh(loader.path + std::to_string(meshNo) + std::to_string(primitiveNo), loader.getModelData(meshNo, primitiveNo));
 
         drawGroup.register_mesh(meshManager.get_mesh_ptr(meshManager.meshIndex), renderer.loop_task_graph);
 

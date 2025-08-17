@@ -15,7 +15,7 @@
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
 
-constexpr const char* GLOBAL_SHADER_PATH = "C:/dev/Engine_project/shaders";
+constexpr const char* GLOBAL_SHADER_PATH = "C:/dev/Vulkan_engine/shaders";
 constexpr float V_FOV = 60.0f;
 
 struct Renderer {
@@ -42,6 +42,8 @@ struct Renderer {
     static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo);
 
     void draw_mesh_task(const DrawGroup& drawGroup, bool clear = false);
+
+    void registerDrawGroup(DrawGroup&& drawGroup);
 
     static void update_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
 
