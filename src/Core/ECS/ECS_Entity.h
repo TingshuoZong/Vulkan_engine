@@ -13,6 +13,7 @@ static Entity next_entity_id = 1;
  * @brief A singleton class that manages the whole ECS accessed through the @c ecs namespace
  * All of the @ref ComponentManager and @ref SystemManager for each type of component and system should be registered with this
  * The @ref ComponentManagers are stored in a @c std::unordered_map based on their types
+ * @see ECS_DESIGN for ECS design suggestion/guidelines
  */
 class EntityManager {
 public:

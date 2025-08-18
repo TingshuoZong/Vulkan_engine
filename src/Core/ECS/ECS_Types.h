@@ -2,6 +2,7 @@
 #include <cstdint>
 
 /// @brief @c Entity is just an alias of @c std::uint32_t which is just the id of the entity
+/// @see ECS_DESIGN for ECS design suggestion/guidelines
 using Entity = std::uint32_t;
 constexpr Entity INVALID_ENTITY = 0;
 

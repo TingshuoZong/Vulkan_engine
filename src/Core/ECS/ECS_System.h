@@ -8,6 +8,7 @@
 #include "ECS_Messages.h"
 
 /// @brief Manages the systems of all of the entities
+/// @see ECS_DESIGN for ECS design suggestion/guidelines
 class SystemManager {
 public:
     /**

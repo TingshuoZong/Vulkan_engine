@@ -15,6 +15,7 @@
  * @note Each entity may only have one of each type of component, trying to add a component when an entity already has a component of that type will result in the previous component being replaced by the new one
  * 
  * @tparam T The actual component that the manager will be managing
+ * @see ECS_DESIGN for ECS design suggestion/guidelines
  */
 template <typename T>
 class ComponentManager: public IComponentManager {

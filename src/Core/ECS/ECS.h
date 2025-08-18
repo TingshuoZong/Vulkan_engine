@@ -4,6 +4,7 @@
 #include "ECS_Component.h"
 
 /// @brief The ecs namespace has a EntityManager in the global scope as a singleton
+/// @see ECS_DESIGN for ECS design suggestion/guidelines
 namespace ecs {
     inline EntityManager entityManager;
 

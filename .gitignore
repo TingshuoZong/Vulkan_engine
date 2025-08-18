@@ -3,6 +3,7 @@
 .cache/*
 .vs/*
 .idea/*
+build/*
 vcpkg_installed/*
 docs/html/*
 docs/latex/*
