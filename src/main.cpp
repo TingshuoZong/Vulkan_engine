@@ -1,6 +1,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+
 #include <tiny_gltf.h>	// This include is necessary to get TINYGLTF and STB_IMAGE to work
 
 #include <Core/Engine.h>

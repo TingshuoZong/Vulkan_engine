@@ -2,10 +2,13 @@
 
 namespace InputSystem {
     bool mouse_captured = true;
+    bool escape_repeat_acctuations = false;     // Stops the mouse from capturing and uncapturing every frame is escape is held down for more than a frame
 
     void process_input(GLFWwindow* window, Camera& camera, float delta_time) {
         auto* app = static_cast<GLFW_Window::AppWindow*>(glfwGetWindowUserPointer(window));
         if (!app || !app->camera_ptr) return;
+
+        process_mouse(window, camera);
 
         float velocity = camera.movement_speed * delta_time;
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -20,20 +23,28 @@ namespace InputSystem {
             camera.position += camera.up * velocity;
         if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
             camera.position -= camera.up * velocity;
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && mouse_captured) {
-            app->set_mouse_capture(false);
-        }
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            if (!escape_repeat_acctuations) {
+                if (mouse_captured) {
+                    app->set_mouse_capture(false);
+                    mouse_captured = false;
+                }
+                else {
+                    app->set_mouse_capture(true);
+                    mouse_captured = true;
+                }
+                escape_repeat_acctuations = true;
+            }
+        } else { escape_repeat_acctuations = false; }
     }
 
-    void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    void process_mouse(GLFWwindow* window, Camera& camera) {
         static bool first_mouse = true;
         static float last_x = 800.0f / 2;
         static float last_y = 600.0f / 2;
 
-        auto* app = static_cast<GLFW_Window::AppWindow*>(glfwGetWindowUserPointer(window));
-        if (!app || !app->camera_ptr) return;
-
-        Camera& camera = *app->camera_ptr;
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
 
         if (first_mouse) {
             last_x = xpos;
@@ -57,8 +68,10 @@ namespace InputSystem {
 
         camera.update_vectors();
 
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-			app->set_mouse_capture(true);
-		}
+        if (mouse_captured) {
+            glfwSetCursorPos(window, 400.0, 300.0);
+            last_x = 400.0;
+            last_y = 300.0;
+        }
     }
 }
