@@ -31,7 +31,7 @@ public:
                     auto meshComponent = meshComponentManager.getComponent(TransformUpdatedMessage.entity_id);
                     auto sharedMeshPointer = meshComponent->mesh.lock();
 
-                    meshComponent->getInstanceData().model_matrix = TransformUpdatedMessage.model_matrix;
+                    meshComponent->getInstanceData().model_matrix = to_daxa(TransformUpdatedMessage.model_matrix);
                     if (meshComponent && !meshesToUpdate.contains(sharedMeshPointer)) {
                         meshesToUpdate.insert(sharedMeshPointer);
                     }

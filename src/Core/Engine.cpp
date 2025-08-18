@@ -46,11 +46,39 @@ int init() {
     });
     renderer.init();
 
-    std::shared_ptr<daxa::RasterPipeline> pipeline;
+    //std::shared_ptr<daxa::RasterPipeline> skybox_rendering_pipeline;
+    //{
+    //    auto result = renderer.pipeline_manager.add_raster_pipeline2({
+    //        .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile("skybox_rendering.vert.glsl"), .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+    //        .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile("skybox_rendering.frag.glsl"), .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+    //        .color_attachments = {{.format = renderer.swapchain.get_format()}},
+    //        .depth_test = daxa::DepthTestInfo{
+    //            .depth_attachment_format = daxa::Format::D32_SFLOAT,
+    //            .enable_depth_write = false,
+    //            .depth_test_compare_op = daxa::CompareOp::LESS_OR_EQUAL,
+    //            .min_depth_bounds = 0.0f,
+    //            .max_depth_bounds = 1.0f,
+    //        },
+    //        .raster = daxa::RasterizerInfo{
+    //            .face_culling = daxa::FaceCullFlagBits::FRONT_BIT,
+    //            .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
+    //        },
+    //        .push_constant_size = sizeof(PushConstant),  // HUST CHANGE!!!!!!!
+    //        .name = "skybox sampling",
+    //    });
+
+    //    if (result.is_err()) {
+    //        std::cerr << result.message() << std::endl;
+    //        return -1;
+    //    }
+    //    skybox_rendering_pipeline = result.value();
+    //}
+
+    std::shared_ptr<daxa::RasterPipeline> mesh_rendering_pipeline;
     {
         auto result = renderer.pipeline_manager.add_raster_pipeline2({
-            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.vert.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
-            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.frag.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"mesh_rendering.vert.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"mesh_rendering.frag.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
             .color_attachments = {{.format = renderer.swapchain.get_format()}},
             .depth_test = daxa::DepthTestInfo{
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,
@@ -64,14 +92,14 @@ int init() {
                 .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
             },
             .push_constant_size = sizeof(PushConstant),
-            .name = "my pipeline",
+            .name = "mesh rendering",
             });
 
         if (result.is_err()) {
             std::cerr << result.message() << std::endl;
             return -1;
         }
-        pipeline = result.value();
+        mesh_rendering_pipeline = result.value();
     }
 
     daxa::SamplerId sampler = device.create_sampler({
@@ -84,7 +112,7 @@ int init() {
 
 // -----------------------------------------------------------------------------------------------------------------
     MeshManager meshManager(device);
-    DrawGroup drawGroup(device, pipeline, "My DrawGroup");
+    DrawGroup drawGroup(device, mesh_rendering_pipeline, "My DrawGroup");
     renderer.registerDrawGroup(std::move(drawGroup));
 
     BulkTextureUploadManager uploadManager;

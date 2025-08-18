@@ -35,7 +35,7 @@ public:
         drawGroup.register_mesh(meshManager.get_mesh_ptr(meshManager.meshIndex), renderer.loop_task_graph);
 
         mesh.lock()->instance_data.push_back({
-            .model_matrix = glm::mat4(1.0f),
+            .model_matrix = to_daxa(glm::mat4(1.0f)),
             .texture = texture.albedo,
             .tex_sampler = texture.tex_sampler
         });
@@ -46,7 +46,7 @@ public:
         // Add an instanced mesh
 
         mesh.lock()->instance_data.push_back({
-            .model_matrix = glm::mat4(1.0f),
+            .model_matrix = to_daxa(glm::mat4(1.0f)),
             .texture = texture.albedo,
             .tex_sampler = texture.tex_sampler
         });

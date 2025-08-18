@@ -7,6 +7,7 @@
     // CPU side only definitions
     #include <glm/glm.hpp>
     #include <glm/gtc/matrix_transform.hpp>
+    #include <Tools/maths_type_casts.h>
 
     struct UniformBufferObject {
         glm::mat4 view;
@@ -14,7 +15,7 @@
     };
 
     struct PerInstanceData {
-        glm::mat4 model_matrix;
+        daxa_f32mat4x4 model_matrix;
         daxa_ImageViewId texture;
         daxa_SamplerId tex_sampler;
         daxa_u32 _pad0;
