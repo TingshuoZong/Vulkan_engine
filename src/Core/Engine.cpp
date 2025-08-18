@@ -33,6 +33,7 @@
 constexpr float MAX_DELTA_TIME = 0.1f;
 
 int init() {
+    ///@brief Sets up a window, daxa instance and a @ref Renderer
     auto window = GLFW_Window::AppWindow("Hur Dur", 1600, 900);
 
     daxa::Instance instance = daxa::create_instance({});
@@ -75,6 +76,7 @@ int init() {
     //    skybox_rendering_pipeline = result.value();
     //}
 
+    ///@brief This is the mesh rendering pipeline and is what is going to be used to combine all the lighting
     std::shared_ptr<daxa::RasterPipeline> mesh_rendering_pipeline;
     {
         auto result = renderer.pipeline_manager.add_raster_pipeline2({
@@ -112,6 +114,7 @@ int init() {
     });
 
 // -----------------------------------------------------------------------------------------------------------------
+    ///@brief Creates a @ref MeshManager, @ref DrawGroup and registers the drawgroup with the @ref Renderer so it gets put in the @ref Renderer::draw_mesh_task
     MeshManager meshManager(device);
     DrawGroup drawGroup(device, mesh_rendering_pipeline, "My DrawGroup");
     renderer.registerDrawGroup(std::move(drawGroup));
@@ -197,7 +200,7 @@ int init() {
     auto last_frame_time = static_cast<float>(glfwGetTime());
     ecs::updateSystems();
 
-    // Main loop
+    ///@brief Main game loop
     while (!window.should_close()) {
         auto current_time = static_cast<float>(glfwGetTime());
 

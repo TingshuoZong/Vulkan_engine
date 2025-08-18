@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(VulkanEngine VERSION 1.0)
+project(VulkanEngine VERSION 0.2)
 
 # -------------------- Copy shaders over to be compiled in runtime --------------------
 set(SHADERS_SRC_DIR "${CMAKE_SOURCE_DIR}/shaders")
