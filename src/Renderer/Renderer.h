@@ -15,8 +15,13 @@
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
 
+#include <Daxa/utils/imgui.hpp>
+#include <imgui_impl_glfw.h>
+
 constexpr const char* GLOBAL_SHADER_PATH = "C:/dev/Engine_project/shaders";
 constexpr float V_FOV = 60.0f;
+
+constexpr bool DEBUG_WINDOW = true;
 
 struct Renderer {
     // TODO: implement a name to prevent daxa name conflicts
@@ -36,6 +41,8 @@ struct Renderer {
     daxa::TaskImage task_z_buffer;
     daxa::TaskImage task_swapchain_image;
     daxa::TaskGraph loop_task_graph;
+
+    daxa::ImGuiRenderer imguiRenderer;
 
     Renderer(GLFW_Window::AppWindow& window, daxa::Device& device, daxa::Instance& instance);
 

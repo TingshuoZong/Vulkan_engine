@@ -58,10 +58,10 @@ void Renderer::draw_mesh_task(
     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_instance_buffer));
     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_command_buffer));
     attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_index_buffer));
-
+    
     loop_task_graph.add_task({
         .attachments = attachments,
-        .task = [=](const daxa::TaskInterface& ti) {
+        .task = [&](const daxa::TaskInterface& ti) {
             auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
             daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
                 .color_attachments = std::array{
@@ -102,6 +102,8 @@ void Renderer::draw_mesh_task(
             });
 
             ti.recorder = std::move(render_recorder).end_renderpass();
+
+            imguiRenderer.record_commands(ImGui::GetDrawData(), ti.recorder, ti.get(task_swapchain_image).ids[0], size.x, size.y);
         },
         .name = "draw mesh",
     });
@@ -170,6 +172,21 @@ void Renderer::init() {
     loop_task_graph.use_persistent_buffer(task_uniform_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
+
+    if (DEBUG_WINDOW) {
+        daxa::ImGuiRendererInfo imguiRendererInfo;
+
+        imguiRendererInfo.device = device;
+        imguiRendererInfo.format = swapchain.get_format();
+        imguiRendererInfo.context = ImGui::CreateContext();
+        imguiRenderer = daxa::ImGuiRenderer(imguiRendererInfo);
+
+        ImGui_ImplGlfw_InitForVulkan(window.get_glfw_window(), true);
+        
+
+        ImGui::GetIO().DisplaySize = ImVec2(swapchain.get_surface_extent().x, swapchain.get_surface_extent().y);
+        ImGui::StyleColorsDark();
+    }
 }
 
 void Renderer::submit_task_graph() {

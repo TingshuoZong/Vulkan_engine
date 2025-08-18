@@ -8,5 +8,5 @@ namespace InputSystem {
 	extern bool mouse_captured;
 
 	void process_input(GLFWwindow* window, Camera& camera, float delta_time);
-	void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+	void process_mouse(GLFWwindow* window, Camera& camera);
 };

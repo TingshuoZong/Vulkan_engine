@@ -26,6 +26,9 @@
 
 #include <iostream>
 
+#include <Daxa/utils/imgui.hpp>
+#include <imgui_impl_glfw.h>
+
 constexpr float MAX_DELTA_TIME = 0.1f;
 
 int init() {
@@ -78,6 +81,7 @@ int init() {
         .address_mode_u = daxa::SamplerAddressMode::REPEAT,
         .address_mode_v = daxa::SamplerAddressMode::REPEAT,
     });
+
 // -----------------------------------------------------------------------------------------------------------------
     MeshManager meshManager(device);
     DrawGroup drawGroup(device, pipeline, "My DrawGroup");
@@ -148,7 +152,6 @@ int init() {
     //    }
     //}
 
-
     renderer.drawGroups[0].uploadBuffers(meshManager.upload_task_graph);
 
     meshManager.submit_upload_task_graph();
@@ -159,7 +162,6 @@ int init() {
 
     auto* glfw_window = window.get_glfw_window();
     window.camera_ptr = &camera;
-    glfwSetCursorPosCallback(glfw_window, InputSystem::mouse_callback);
 
     window.set_mouse_capture(true);
 
@@ -197,6 +199,18 @@ int init() {
         //        }
         //    }
         //}
+        if (DEBUG_WINDOW) {
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            ImGui::Begin("Debug");
+            {
+                float idk = 0.0f;
+                ImGui::Text("Mwerpy says hi");
+                ImGui::SliderFloat("Test slider", &idk, 0.0f, 1.0f);
+            }
+            ImGui::End();
+            ImGui::Render();
+        }
         // ------------------------------------------------------- Goofy ahh test stuff ------------------------------------------------------
         ecs::updateSystems();
 
@@ -211,6 +225,7 @@ int init() {
 
     renderer.cleanup();
 
+    ImGui_ImplGlfw_Shutdown();
 
     device.wait_idle();
     device.collect_garbage();
