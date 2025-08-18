@@ -5,7 +5,6 @@
 
 #include "Renderer/Meshes/DrawableMesh.h"
 #include "Renderer/Meshes/DrawGroup.h"
-#include "Renderer/Meshes/ManagedMesh.h"
 #include "Renderer/Textures/TextureHandle.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/MeshManager.h"
@@ -16,9 +15,11 @@
 
 #include "Tools/Model_loader.h"
 
+#include "ECS_modules/Managed_mesh/ManagedMesh.h"
+
 #include "ECS/ECS.h"
 
-#include "Transform/Transform_component.h"
+#include "ECS_modules/Transform/Transform_component.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -91,7 +92,7 @@ int init() {
                 .face_culling = daxa::FaceCullFlagBits::BACK_BIT,
                 .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
             },
-            .push_constant_size = sizeof(PushConstant),
+            .push_constant_size = sizeof(meshRenderer::PushConstant),
             .name = "mesh rendering",
             });
 

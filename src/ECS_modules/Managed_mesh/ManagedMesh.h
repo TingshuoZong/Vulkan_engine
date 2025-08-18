@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DrawableMesh.h"
-#include "DrawGroup.h"
+#include "Renderer/Meshes/DrawableMesh.h"
+#include "Renderer/Meshes/DrawGroup.h"
 #include "shared.inl"
 
 #include "Core/ECS/ECS_Component.h"
@@ -59,7 +59,7 @@ public:
         } else std::cerr << "Warning: instantiate failed: only the first instance of a mesh can instantiate meshes\n";
     }
 
-    [[nodiscard]] PerInstanceData& getInstanceData() const {
+    [[nodiscard]] meshRenderer::PerInstanceData& getInstanceData() const {
         return mesh.lock()->instance_data[instanceNo];
     }
 

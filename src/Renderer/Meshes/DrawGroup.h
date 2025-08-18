@@ -45,20 +45,20 @@ struct DrawGroup {
 	void reallocBuffers();
 
 	void loadBufferInfo(
-		std::vector<Vertex>& vertexStagingArr,
+		std::vector<meshRenderer::Vertex>& vertexStagingArr,
 		std::vector<uint32_t>& indexStagingArr,
-		std::vector<PerInstanceData>& instanceStagingArr);
+		std::vector<meshRenderer::PerInstanceData>& instanceStagingArr);
 
 	void uploadBufferData(
 		daxa::TaskGraph& tg,
-		std::vector<Vertex>& vertexStagingArr,
+		std::vector<meshRenderer::Vertex>& vertexStagingArr,
 		std::vector<uint32_t>& indexStagingArr,
-		std::vector<PerInstanceData>& instanceStagingArr);
+		std::vector<meshRenderer::PerInstanceData>& instanceStagingArr);
 
 	inline void uploadBuffers(daxa::TaskGraph& tg) {
- 		std::vector<Vertex> vertexStagingArr;
+ 		std::vector<meshRenderer::Vertex> vertexStagingArr;
 		std::vector<uint32_t> indexStagingArr;
-		std::vector<PerInstanceData> instanceStagingArr;
+		std::vector<meshRenderer::PerInstanceData> instanceStagingArr;
 
 		loadBufferInfo(vertexStagingArr, indexStagingArr, instanceStagingArr);
 		allocBuffers();

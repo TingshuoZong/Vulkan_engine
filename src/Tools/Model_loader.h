@@ -6,7 +6,7 @@
 #include <stb_image.h>
 
 struct ParsedPrimitive {
-    std::vector<Vertex> vertices;
+    std::vector<meshRenderer::Vertex> vertices;
     std::vector<uint32_t> indices;
     std::size_t vertexCount;
     std::size_t indexCount;

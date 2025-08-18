@@ -17,7 +17,7 @@ struct DrawableMesh {
     std::uint32_t index_offset;
     std::uint32_t instance_offset;
 
-    std::vector<Vertex> verticies;
+    std::vector<meshRenderer::Vertex> verticies;
     std::vector<uint32_t> indicies;
 
     std::vector<std::uint32_t> instance_data_offsets;
@@ -27,7 +27,7 @@ struct DrawableMesh {
     std::uint32_t vertex_count;
     std::uint32_t index_count;
 
-    std::vector<PerInstanceData> instance_data;
+    std::vector<meshRenderer::PerInstanceData> instance_data;
 
     std::string name;
 

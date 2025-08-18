@@ -1,11 +1,11 @@
 #include "Renderer.h"
 
-UniformBufferObject ubo{
-        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                            glm::vec3(0.0f, 0.0f, 0.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f)),
+meshRenderer::UniformBufferObject ubo{
+        .view = to_daxa(glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                                    glm::vec3(0.0f, 0.0f, 0.0f),
+                                    glm::vec3(0.0f, 0.0f, 1.0f))),
 
-        .proj = glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f),
+        .proj = to_daxa(glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f)),
 };
 
 void Renderer::registerDrawGroup(DrawGroup&& drawGroup) {
@@ -13,24 +13,24 @@ void Renderer::registerDrawGroup(DrawGroup&& drawGroup) {
     drawGroups.back().drawGroupIndex = drawGroups.size() - 1;
 }
 
-void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo) {
+void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const meshRenderer::UniformBufferObject &ubo) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, uniform_buffer)
         },
         .task = [=](const daxa::TaskInterface &ti) {
             auto uniform_staging = ti.device.create_buffer({
-                           .size = sizeof(UniformBufferObject),
+                           .size = sizeof(meshRenderer::UniformBufferObject),
                            .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
                            .name = "uniform staging buffer",
             });
             ti.recorder.destroy_buffer_deferred(uniform_staging);
-            auto* uniform_ptr = ti.device.buffer_host_address_as<UniformBufferObject>(uniform_staging).value();
+            auto* uniform_ptr = ti.device.buffer_host_address_as<meshRenderer::UniformBufferObject>(uniform_staging).value();
             *uniform_ptr = ubo;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = uniform_staging,
                 .dst_buffer = ti.get(uniform_buffer).ids[0],
-                .size = sizeof(UniformBufferObject),
+                .size = sizeof(meshRenderer::UniformBufferObject),
             });
         },
         .name = "upload uniform data",
@@ -87,7 +87,7 @@ void Renderer::draw_mesh_task(
                 .index_type = daxa::IndexType::uint32,
             });
 
-            render_recorder.push_constant(PushConstant{
+            render_recorder.push_constant(meshRenderer::PushConstant{
                 .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
                 .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
                 .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
@@ -110,11 +110,11 @@ void Renderer::draw_mesh_task(
 }
 
 void Renderer::update_uniform_buffer(const daxa::Device& device, const daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
-    UniformBufferObject ubo{};
-    ubo.view = camera.get_view_matrix();
-    ubo.proj = camera.get_projection(aspect_ratio);
+    meshRenderer::UniformBufferObject ubo{};
+    ubo.view = to_daxa(camera.get_view_matrix());
+    ubo.proj = to_daxa(camera.get_projection(aspect_ratio));
 
-    auto* ptr = device.buffer_host_address_as<UniformBufferObject>(uniform_buffer_id).value();
+    auto* ptr = device.buffer_host_address_as<meshRenderer::UniformBufferObject>(uniform_buffer_id).value();
     *ptr = ubo;
 }
 
@@ -145,7 +145,7 @@ void Renderer::init() {
     });
 
     uniform_buffer_id = device.create_buffer({
-        .size = sizeof(UniformBufferObject),
+        .size = sizeof(meshRenderer::UniformBufferObject),
         .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
         .name = "Uniform buffer MVP",
     });
