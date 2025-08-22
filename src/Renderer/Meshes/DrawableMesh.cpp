@@ -1,4 +1,5 @@
 #include "DrawableMesh.h"
+/// @file Currently unused due to uploading mesh being done in @ref DrawGroup
 
 // void DrawableMesh::upload_mesh_data_task(
 //     daxa::TaskGraph& tg,

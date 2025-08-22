@@ -1,9 +1,13 @@
 .build/*
 .build-clangd-linux/*
+.build-linux/*
 .cache/*
 .vs/*
 .idea/*
+build/*
 vcpkg_installed/*
+docs/html/*
+docs/latex/*
 lib/Daxa/*
 lib/vcpkg/*
 out/*

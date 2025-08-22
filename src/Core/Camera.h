@@ -17,10 +17,11 @@ struct Camera {
     glm::vec3 up = { 0.0f, 1.0f, 0.0f };
     glm::vec3 right = { 1.0f, 0.0f, 0.0f };
 
+    /// @brief Takes the mouse pitch and yaw and turns it into the x,y,z components of the camera's euler rotation and normalizes them
     void update_vectors();
 
+    /// @brief Gets the view matrix
     glm::mat4 get_view_matrix() { return glm::lookAt(position, position + front, up); }
-
-
+    /// @brief Gets the projection matrix
     glm::mat4 get_projection(float aspect_ratio) const;
 };

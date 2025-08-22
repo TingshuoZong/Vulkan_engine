@@ -4,9 +4,9 @@
 #include <unordered_set>
 #include <variant>
 
-#include "Core/Transform/Transform_messages.h"
+#include "ECS_modules/Transform/Transform_messages.h"
 
-#include "Renderer/Meshes/ManagedMesh.h"
+#include "ECS_modules/Managed_mesh/ManagedMesh.h"
 
 class TransformSystem : public ISystem {
 public:
@@ -43,8 +43,8 @@ public:
 
     inline void updatePerInstanceData() {
         for (auto& mesh : meshesToUpdate) {
-            auto* ptr = device.buffer_host_address_as<PerInstanceData>(renderer.drawGroups[mesh->drawGroupIndex].instance_buffer_id).value();
-            memcpy(ptr + mesh->instance_offset, mesh->instance_data.data(), mesh->instance_data.size() * sizeof(PerInstanceData));
+            auto* ptr = device.buffer_host_address_as<meshRenderer::PerInstanceData>(renderer.drawGroups[mesh->drawGroupIndex].instance_buffer_id).value();
+            memcpy(ptr + mesh->instance_offset, mesh->instance_data.data(), mesh->instance_data.size() * sizeof(meshRenderer::PerInstanceData));
         }
         meshesToUpdate.clear();
     }

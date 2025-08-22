@@ -14,14 +14,9 @@ void Camera::update_vectors() {
 }
 
 glm::mat4 Camera::get_projection(float aspect_ratio) const {
-    /*glm::mat4 correction = glm::mat4(
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, -1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 0.5f, 0.0f,
-        0.0f, 0.0f, 0.5f, 1.0f
-    );*/
-    glm::mat4 proj = /*correction **/ glm::perspective(glm::radians(this->fov), aspect_ratio, 0.1f, 100.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(this->fov), aspect_ratio, 0.1f, 100.0f);
 
-    proj[1][1] *= -1.0f; // Vulkan correction
+    ///@brief Correction for the difference in the GLM vs. Vulkan projection matricies
+    proj[1][1] *= -1.0f;
     return proj;
 }
