@@ -3,6 +3,8 @@
 .cache/*
 .vs/*
 .idea/*
+docs/html/*
+docs/latex/*
 vcpkg_installed/*
 lib/Daxa/*
 lib/vcpkg/*
