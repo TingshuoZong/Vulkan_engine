@@ -19,6 +19,13 @@ struct UploadData {
     uint32_t height;
 };
 
+/**
+ * @brief The manager that acually queues up all the textures to be uploaded and submits its to the GPU
+ * 
+ * @c BulkTextureUploadManager will typically be used as a singleton and is used to batch texture uploads to decrease the number of tasks
+ * @ref TextureHandle loading
+ * 
+ */
 class BulkTextureUploadManager {
 public:
     void submitUpload(const UploadData& uploadData) { uploads.push_back(uploadData); }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Core/Transform/Transform_messages.h"
-#include "Core/Transform/Transform_system.h"
+#include "ECS_modules/Transform/Transform_messages.h"
+#include "ECS_modules/Transform/Transform_system.h"
 
 #include <glm/gtx/euler_angles.hpp>
 

@@ -10,7 +10,7 @@ void DrawGroup::cleanup() {
 
 void DrawGroup::allocBuffers() {
 	vertex_buffer_id = device.create_buffer({
-		.size = total_vertex_count * sizeof(Vertex),
+		.size = total_vertex_count * sizeof(meshRenderer::Vertex),
 		.name = name + " vertex buffer"
 		});
 
@@ -40,7 +40,7 @@ void DrawGroup::allocBuffers() {
 		});
 
 	instance_buffer_id = device.create_buffer({
-		.size = MAX_DRAWGROUP_INSTANCE_COUNT * sizeof(PerInstanceData),
+		.size = MAX_DRAWGROUP_INSTANCE_COUNT * sizeof(meshRenderer::PerInstanceData),
 		.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
 		.name = name + " instance SSBO"
 		});
@@ -52,9 +52,9 @@ void DrawGroup::allocBuffers() {
 }
 
 void DrawGroup::loadBufferInfo(
-	std::vector<Vertex>& vertexStagingArr,
+	std::vector<meshRenderer::Vertex>& vertexStagingArr,
 	std::vector<uint32_t>& indexStagingArr,
-	std::vector<PerInstanceData>& instanceStagingArr)
+	std::vector<meshRenderer::PerInstanceData>& instanceStagingArr)
 {
 	// Create big buffers
 	uint32_t currentIndexCount = 0;
@@ -111,9 +111,9 @@ void DrawGroup::loadBufferInfo(
 
 void DrawGroup::uploadBufferData(
 	daxa::TaskGraph& tg, 
-	std::vector<Vertex>& vertexStagingArr, 
+	std::vector<meshRenderer::Vertex>& vertexStagingArr,
 	std::vector<uint32_t>& indexStagingArr, 
-	std::vector<PerInstanceData>& instanceStagingArr) 
+	std::vector<meshRenderer::PerInstanceData>& instanceStagingArr)
 {
 	tg.add_task({
 		.attachments = {
@@ -123,18 +123,18 @@ void DrawGroup::uploadBufferData(
 		},
 		.task = [=, this](daxa::TaskInterface ti) {
 			auto vertex_staging = ti.device.create_buffer({
-						   .size = vertexStagingArr.size() * sizeof(Vertex),
+						   .size = vertexStagingArr.size() * sizeof(meshRenderer::Vertex),
 						   .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
 						   .name = this->name + ">" + name + "vertex staging buffer",
 			});
 			ti.recorder.destroy_buffer_deferred(vertex_staging);
-			auto* vertex_ptr = ti.device.buffer_host_address_as<Vertex>(vertex_staging).value();
-			memcpy(vertex_ptr, vertexStagingArr.data(), vertexStagingArr.size() * sizeof(Vertex));
+			auto* vertex_ptr = ti.device.buffer_host_address_as<meshRenderer::Vertex>(vertex_staging).value();
+			memcpy(vertex_ptr, vertexStagingArr.data(), vertexStagingArr.size() * sizeof(meshRenderer::Vertex));
 
 			ti.recorder.copy_buffer_to_buffer({
 				.src_buffer = vertex_staging,
 				.dst_buffer = ti.get(this->task_vertex_buffer).ids[0],
-				.size = vertexStagingArr.size() * sizeof(Vertex),
+				.size = vertexStagingArr.size() * sizeof(meshRenderer::Vertex),
 			});
 
 			auto index_staging = ti.device.create_buffer({

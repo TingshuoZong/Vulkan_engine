@@ -69,7 +69,7 @@ void GLTF_Loader::LoadModel() {
 
             size_t vertexCount = posAccessor.count;
             for (size_t i = 0; i < vertexCount; ++i) {
-                Vertex v;
+                meshRenderer::Vertex v;
                 v.position = {
                     positions[i * 3 + 0],
                     positions[i * 3 + 1],

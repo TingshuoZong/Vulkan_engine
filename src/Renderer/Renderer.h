@@ -46,7 +46,7 @@ struct Renderer {
 
     Renderer(GLFW_Window::AppWindow& window, daxa::Device& device, daxa::Instance& instance);
 
-    static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo);
+    static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const meshRenderer::UniformBufferObject &ubo);
 
     void draw_mesh_task(const DrawGroup& drawGroup, bool clear = false);
 
