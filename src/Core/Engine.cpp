@@ -48,33 +48,33 @@ int init() {
     });
     renderer.init();
 
-    //std::shared_ptr<daxa::RasterPipeline> skybox_rendering_pipeline;
-    //{
-    //    auto result = renderer.pipeline_manager.add_raster_pipeline2({
-    //        .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile("skybox_rendering.vert.glsl"), .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
-    //        .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile("skybox_rendering.frag.glsl"), .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
-    //        .color_attachments = {{.format = renderer.swapchain.get_format()}},
-    //        .depth_test = daxa::DepthTestInfo{
-    //            .depth_attachment_format = daxa::Format::D32_SFLOAT,
-    //            .enable_depth_write = false,
-    //            .depth_test_compare_op = daxa::CompareOp::LESS_OR_EQUAL,
-    //            .min_depth_bounds = 0.0f,
-    //            .max_depth_bounds = 1.0f,
-    //        },
-    //        .raster = daxa::RasterizerInfo{
-    //            .face_culling = daxa::FaceCullFlagBits::FRONT_BIT,
-    //            .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
-    //        },
-    //        .push_constant_size = sizeof(PushConstant),  // HUST CHANGE!!!!!!!
-    //        .name = "skybox sampling",
-    //    });
+    std::shared_ptr<daxa::RasterPipeline> skybox_rendering_pipeline;
+    {
+        auto result = renderer.pipeline_manager.add_raster_pipeline2({
+            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile("skybox_rendering.vert.glsl"), .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile("skybox_rendering.frag.glsl"), .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+            .color_attachments = {{.format = renderer.swapchain.get_format()}},
+            .depth_test = daxa::DepthTestInfo{
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_write = false,
+                .depth_test_compare_op = daxa::CompareOp::LESS_OR_EQUAL,
+                .min_depth_bounds = 0.0f,
+                .max_depth_bounds = 1.0f,
+            },
+            .raster = daxa::RasterizerInfo{
+                .face_culling = daxa::FaceCullFlagBits::FRONT_BIT,
+                .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
+            },
+            .push_constant_size = sizeof(meshRenderer::PushConstant),  // HUST CHANGE!!!!!!!
+            .name = "skybox sampling",
+        });
 
-    //    if (result.is_err()) {
-    //        std::cerr << result.message() << std::endl;
-    //        return -1;
-    //    }
-    //    skybox_rendering_pipeline = result.value();
-    //}
+        if (result.is_err()) {
+            std::cerr << result.message() << std::endl;
+            return -1;
+        }
+        skybox_rendering_pipeline = result.value();
+    }
 
     ///@brief This is the mesh rendering pipeline and is what is going to be used to combine all the lighting
     std::shared_ptr<daxa::RasterPipeline> mesh_rendering_pipeline;
@@ -82,7 +82,10 @@ int init() {
         auto result = renderer.pipeline_manager.add_raster_pipeline2({
             .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"mesh_rendering.vert.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
             .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"mesh_rendering.frag.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
-            .color_attachments = {{.format = renderer.swapchain.get_format()}},
+            .color_attachments = {
+                {
+                    .format = renderer.swapchain.get_format(),
+                }},
             .depth_test = daxa::DepthTestInfo{
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,
                 .enable_depth_write = true,                      // enable writing to depth buffer

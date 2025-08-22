@@ -32,7 +32,7 @@ namespace ecs {
     /// @return A pointer to the system
     template <typename T>
     inline T* getSystem() {
-        return entityManager.getSystemManager().getSystem();
+        return entityManager.getSystemManager().getSystem<T>();
     }
 
     /// @brief Gets the appropriate @ref SystemManager

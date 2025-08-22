@@ -7,7 +7,7 @@
 #include "ECS_Types.h"
 #include "ECS_Messages.h"
 
-/// @brief Manages the systems of all of the entities
+/// @brief Manages the systems of all the entities
 /// @see ECS_DESIGN for ECS design suggestion/guidelines
 class SystemManager {
 public:
@@ -38,7 +38,7 @@ public:
             throw std::runtime_error("Error: System not found");
     }
 
-    /// @brief Calls @c update on all of the systems which is defined by @ref ISystem which all systems should inherit from
+    /// @brief Calls @c update on all the systems which is defined by @ref ISystem which all systems should inherit from
     inline void updateSystems() {
         for (auto& system : systems) {
             system.second->update();
