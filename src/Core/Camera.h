@@ -22,6 +22,8 @@ struct Camera {
 
     /// @brief Gets the view matrix
     glm::mat4 get_view_matrix() { return glm::lookAt(position, position + front, up); }
+    /// @brief Gets the view matrix but without the translation
+    glm::mat4 get_view_rot_matrix() { return glm::lookAt(glm::vec3(0.0f), front, up); }
     /// @brief Gets the projection matrix
     glm::mat4 get_projection(float aspect_ratio) const;
 };

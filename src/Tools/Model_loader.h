@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shared.inl"
+#include "mesh_rendering_shared.inl"
 
 #include <tiny_gltf.h>
 #include <stb_image.h>

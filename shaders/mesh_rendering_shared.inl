@@ -3,16 +3,15 @@
 #include <daxa/daxa.inl>
 
 #ifdef __cplusplus
-
-    // CPU side only definitions
-    #include <glm/glm.hpp>
-    #include <glm/gtc/matrix_transform.hpp>
-    #include <Tools/maths_type_casts.h>
+// CPU side only definitions
+#include <Tools/maths_type_casts.h>
 
 namespace meshRenderer {
+
 #else
 // GPU side only definitions
 #include <daxa/daxa.glsl>
+
 #endif
 
 // Code that can be 100% shared between CPU and GPU

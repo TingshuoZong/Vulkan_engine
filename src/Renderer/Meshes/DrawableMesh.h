@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shared.inl"  // For UniformBufferObject or PushConstant
+#include "mesh_rendering_shared.inl"  // For UniformBufferObject or PushConstant
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/task_graph.hpp>

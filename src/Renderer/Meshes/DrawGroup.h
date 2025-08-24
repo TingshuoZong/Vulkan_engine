@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shared.inl"
+#include "mesh_rendering_shared.inl"
 #include "DrawableMesh.h"
 
 #include <daxa/daxa.hpp>

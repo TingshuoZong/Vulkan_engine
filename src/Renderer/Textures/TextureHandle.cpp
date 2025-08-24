@@ -43,7 +43,7 @@ inline void TextureHandle::load_textures_into_buffers(const stbi_uc* pixels, uin
         .format = daxa::Format::R8G8B8A8_UNORM,
         .size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
         .usage = daxa::ImageUsageFlagBits::TRANSFER_DST | daxa::ImageUsageFlagBits::SHADER_SAMPLED,
-        .name = name + " texture image"
+        .name = name + " texture image",
     });
 
     task_texture_image = daxa::TaskImage({

@@ -8,7 +8,7 @@
 #include <stb_image.h>
 
 #include <string>
-constexpr const char* TEXTURE_PATH = "C:/dev/Engine_project/assets/textures/";
+constexpr const char* TEXTURE_PATH = "C:/dev/Engine_project/assets/";
 
 struct UploadData {
     daxa::TaskBuffer task_texture_staging;
