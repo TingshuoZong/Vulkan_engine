@@ -184,7 +184,6 @@ int init() {
         skybox_view = skyboxUploadManager.bulkUploadTextures(meshManager.upload_task_graph, "Skybox ")[0];
     }
     renderer.skybox = Skybox(&device, skybox_rendering_pipeline, skybox_view, sampler);
-    //renderer.skybox.uploadBuffers(meshManager.upload_task_graph);
 
     // int grid_size = 5;
 	// float spacing = 0.08f;

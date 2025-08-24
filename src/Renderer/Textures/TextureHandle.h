@@ -31,11 +31,11 @@ struct TextureHandle;
  */
 class BulkTextureUploadManager {
 public:
-    //void submitUpload(const UploadData& uploadData) { uploads.push_back(uploadData); }
-    void submitUpload2(TextureHandle* textureHandle) { uploads.push_back(textureHandle); }
+    void submitUpload(const UploadData& uploadData) { uploads.push_back(uploadData); }
+    //void submitUpload2(TextureHandle* textureHandle) { uploads.push_back(textureHandle); }
     std::vector <daxa::ImageViewId> bulkUploadTextures(daxa::TaskGraph& taskGraph, const std::string& name);
 private:
-    std::vector<TextureHandle*> uploads;
+    std::vector<UploadData> uploads;
     //std::vector<UploadData> uploads;
     std::vector<daxa::ImageViewId> views;
 };
