@@ -6,7 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(VulkanEngine VERSION 1.0)
+project(VulkanEngine VERSION 0.2)
+
+# Will try to build GLFW with wayland support
+option(PREFER_WAYLAND "Prefer Wayland backend for GLFW" OFF)
 
 # -------------------- Copy shaders over to be compiled in runtime --------------------
 set(SHADERS_SRC_DIR "${CMAKE_SOURCE_DIR}/shaders")
@@ -38,6 +41,31 @@ file(GLOB_RECURSE SRCS
     ${PROJECT_SOURCE_DIR}/src/*.hpp
     ${PROJECT_SOURCE_DIR}/src/*.h
 )
+
+if(UNIX AND NOT APPLE AND PREFER_WAYLAND)
+    message(STATUS "Building GLFW from source with Wayland support")
+
+    # FetchContent is cleaner than manual add_subdirectory for GLFW
+    include(FetchContent)
+    FetchContent_Declare(
+        glfw
+        GIT_REPOSITORY https://github.com/glfw/glfw.git
+        GIT_TAG 3.4
+    )
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_WAYLAND ON CACHE BOOL "Enable Wayland support for GLFW" FORCE)
+
+    FetchContent_MakeAvailable(glfw)
+
+    set(GLFW_TARGET glfw)  # CMake target provided by GLFW source build
+else()
+    message(STATUS "Using prebuilt/system GLFW (likely X11 backend)")
+    find_package(glfw3 CONFIG REQUIRED)
+    set(GLFW_TARGET glfw)
+endif()
 
 if(MSVC)
     # Arrange groups in Visual Studio
@@ -83,6 +111,6 @@ target_sources(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE 
-    glfw
+    ${GLFW_TARGET}
     daxa::daxa
 )

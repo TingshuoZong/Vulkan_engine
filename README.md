@@ -15,6 +15,10 @@ cmake .. -G "Ninja"
 ninja
 ```
 
+## Documentation
+
+Detailed documentation is generated with doxygen and can be found: [View Documentation](docs/html/index.html)
+
 ## ECS
 
 The ECS is the main way game code will interact with the game engine, components such as `ManagedMesh` and `TransformComponent` allow for common functions such as rendering objects.
@@ -23,7 +27,7 @@ The ECS is the main way game code will interact with the game engine, components
 
 The ECS exists as a singleton accessed through the `ecs` namespace.
 
-### **IMPORTANT:** Please read ECS_DESIGN.md if extending ECS
+### **IMPORTANT:** Please read [ECS_DESIGN.md](docs/markdown_docs/ECS_DESIGN.md) if extending ECS
 
 ## Low-level systems
 

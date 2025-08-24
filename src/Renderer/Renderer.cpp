@@ -1,11 +1,11 @@
 #include "Renderer.h"
 
-UniformBufferObject ubo{
-        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                            glm::vec3(0.0f, 0.0f, 0.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f)),
+meshRenderer::UniformBufferObject ubo{
+        .view = to_daxa(glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                                    glm::vec3(0.0f, 0.0f, 0.0f),
+                                    glm::vec3(0.0f, 0.0f, 1.0f))),
 
-        .proj = glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f),
+        .proj = to_daxa(glm::perspective(glm::radians(V_FOV), 1600.0f / 900.0f, 0.1f, 10.0f)),
 };
 
 void Renderer::registerDrawGroup(DrawGroup&& drawGroup) {
@@ -13,51 +13,99 @@ void Renderer::registerDrawGroup(DrawGroup&& drawGroup) {
     drawGroups.back().drawGroupIndex = drawGroups.size() - 1;
 }
 
-void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo) {
+void Renderer::upload_uniform_buffer_task(daxa::TaskGraph& tg, const daxa::TaskBufferView uniform_buffer, const meshRenderer::UniformBufferObject &ubo) {
     tg.add_task({
         .attachments = {
             daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_WRITE, uniform_buffer)
         },
         .task = [=](const daxa::TaskInterface &ti) {
             auto uniform_staging = ti.device.create_buffer({
-                           .size = sizeof(UniformBufferObject),
+                           .size = sizeof(meshRenderer::UniformBufferObject),
                            .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
                            .name = "uniform staging buffer",
             });
             ti.recorder.destroy_buffer_deferred(uniform_staging);
-            auto* uniform_ptr = ti.device.buffer_host_address_as<UniformBufferObject>(uniform_staging).value();
+            auto* uniform_ptr = ti.device.buffer_host_address_as<meshRenderer::UniformBufferObject>(uniform_staging).value();
             *uniform_ptr = ubo;
             ti.recorder.copy_buffer_to_buffer({
                 .src_buffer = uniform_staging,
                 .dst_buffer = ti.get(uniform_buffer).ids[0],
-                .size = sizeof(UniformBufferObject),
+                .size = sizeof(meshRenderer::UniformBufferObject),
             });
         },
         .name = "upload uniform data",
         });
 }
 
-void Renderer::draw_mesh_task(
-    const DrawGroup& drawGroup,
-    const bool clear
-) {
-    loop_task_graph.use_persistent_buffer(drawGroup.task_vertex_buffer);
-    loop_task_graph.use_persistent_buffer(drawGroup.task_index_buffer);
-    loop_task_graph.use_persistent_buffer(drawGroup.task_command_buffer);
-    loop_task_graph.use_persistent_buffer(drawGroup.task_instance_buffer);
+void Renderer::draw_skybox_task() {
 
+    loop_task_graph.add_task({
+        .attachments = {
+            daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, task_skybox_uniform_buffer),
+            daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_swapchain_image),
+            daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_z_buffer),
+        },
+        .task = [&](const daxa::TaskInterface& ti) {
+            auto const size = ti.device.info(ti.get(task_swapchain_image).ids[0]).value().size;
+            daxa::RenderCommandRecorder render_recorder = std::move(ti.recorder).begin_renderpass({
+                .color_attachments = std::array{
+                    daxa::RenderAttachmentInfo{
+                        .image_view = ti.get(task_swapchain_image).view_ids[0],
+                        .load_op = daxa::AttachmentLoadOp::CLEAR,
+                        .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
+                    },
+                },
+                .depth_attachment = daxa::RenderAttachmentInfo{
+                    .image_view = ti.get(task_z_buffer).view_ids[0],
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = daxa::DepthValue{1.0f, 0},
+                },
+                .render_area = {.width = size.x, .height = size.y},
+            });
+
+            render_recorder.set_pipeline(*skybox.pipeline);
+
+            render_recorder.push_constant(skyboxRenderer::PushConstant{
+                .ubo_ptr = ti.device.device_address(ti.get(task_skybox_uniform_buffer).ids[0]).value(),
+                .texture = skybox.skybox_view,
+                .tex_sampler = skybox.sampler
+            });
+
+            render_recorder.draw({
+                .vertex_count = 6,
+                .instance_count = 1,
+                .first_vertex = 0,
+                .first_instance = 0
+            });
+
+            ti.recorder = std::move(render_recorder).end_renderpass();
+
+            imguiRenderer.record_commands(ImGui::GetDrawData(), ti.recorder, ti.get(task_swapchain_image).ids[0], size.x, size.y);
+        },
+        .name = "draw skybox",
+    });
+}
+
+void Renderer::draw_mesh_task() {
     std::vector<daxa::TaskAttachmentInfo> attachments;
 
+    for (auto& drawGroup : drawGroups) {
+        loop_task_graph.use_persistent_buffer(drawGroup.task_vertex_buffer);
+        loop_task_graph.use_persistent_buffer(drawGroup.task_index_buffer);
+        loop_task_graph.use_persistent_buffer(drawGroup.task_command_buffer);
+        loop_task_graph.use_persistent_buffer(drawGroup.task_instance_buffer);
+
+        // Add each drawable's vertex/index/instance buffers
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_vertex_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_instance_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_command_buffer));
+        attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_index_buffer));
+    }
+
     // Shared resources
-    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, task_uniform_buffer));
+    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, task_mesh_uniform_buffer));
     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::COLOR_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_swapchain_image));
     attachments.push_back(daxa::inl_attachment(daxa::TaskImageAccess::DEPTH_ATTACHMENT, daxa::ImageViewType::REGULAR_2D, task_z_buffer));
-
-    // Add each drawable's vertex/index/instance buffers
-    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_vertex_buffer));
-    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::VERTEX_SHADER_READ, drawGroup.task_instance_buffer));
-    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_command_buffer));
-    attachments.push_back(daxa::inl_attachment(daxa::TaskBufferAccess::INDEX_READ, drawGroup.task_index_buffer));
     
     loop_task_graph.add_task({
         .attachments = attachments,
@@ -67,39 +115,41 @@ void Renderer::draw_mesh_task(
                 .color_attachments = std::array{
                     daxa::RenderAttachmentInfo{
                         .image_view = ti.get(task_swapchain_image).view_ids[0],
-                        .load_op = clear ? daxa::AttachmentLoadOp::CLEAR : daxa::AttachmentLoadOp::LOAD,
+                        .load_op = daxa::AttachmentLoadOp::LOAD,
                         .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
                     },
                 },
                 .depth_attachment = daxa::RenderAttachmentInfo{
                     .image_view = ti.get(task_z_buffer).view_ids[0],
-                    .load_op = clear ? daxa::AttachmentLoadOp::CLEAR : daxa::AttachmentLoadOp::LOAD,
+                    .load_op = daxa::AttachmentLoadOp::LOAD,
                     .clear_value = daxa::DepthValue{1.0f, 0},
                 },
                 .render_area = {.width = size.x, .height = size.y},
             });
 
-            render_recorder.set_pipeline(*drawGroup.pipeline);
+            for (auto& drawGroup : drawGroups) {
+                render_recorder.set_pipeline(*drawGroup.pipeline);
 
-            render_recorder.set_index_buffer({
-                .id = ti.get(drawGroup.task_index_buffer).ids[0],
-                .offset = 0,
-                .index_type = daxa::IndexType::uint32,
-            });
+                render_recorder.set_index_buffer({
+                    .id = ti.get(drawGroup.task_index_buffer).ids[0],
+                    .offset = 0,
+                    .index_type = daxa::IndexType::uint32,
+                });
 
-            render_recorder.push_constant(PushConstant{
-                .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
-                .ubo_ptr = ti.device.device_address(ti.get(task_uniform_buffer).ids[0]).value(),
-                .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
-            });
+                render_recorder.push_constant(meshRenderer::PushConstant{
+                    .vertex_ptr = ti.device.device_address(ti.get(drawGroup.task_vertex_buffer).ids[0]).value(),
+                    .ubo_ptr = ti.device.device_address(ti.get(task_mesh_uniform_buffer).ids[0]).value(),
+                    .instance_buffer_ptr = ti.device.device_address(ti.get(drawGroup.task_instance_buffer).ids[0]).value(),
+                });
 
-            render_recorder.draw_indirect({
-                .draw_command_buffer = ti.get(drawGroup.task_command_buffer).ids[0],
-                .indirect_buffer_offset = 0,
-                .draw_count = static_cast<uint32_t>(drawGroup.meshes.size()),
-                .draw_command_stride = sizeof(VkDrawIndexedIndirectCommand),
-                .is_indexed = true
-            });
+                render_recorder.draw_indirect({
+                    .draw_command_buffer = ti.get(drawGroup.task_command_buffer).ids[0],
+                    .indirect_buffer_offset = 0,
+                    .draw_count = static_cast<uint32_t>(drawGroup.meshes.size()),
+                    .draw_command_stride = sizeof(VkDrawIndexedIndirectCommand),
+                    .is_indexed = true
+                });
+            }
 
             ti.recorder = std::move(render_recorder).end_renderpass();
 
@@ -109,12 +159,21 @@ void Renderer::draw_mesh_task(
     });
 }
 
-void Renderer::update_uniform_buffer(const daxa::Device& device, const daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
-    UniformBufferObject ubo{};
-    ubo.view = camera.get_view_matrix();
-    ubo.proj = camera.get_projection(aspect_ratio);
+void Renderer::update_mesh_uniform_buffer(const daxa::Device& device, const daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
+    meshRenderer::UniformBufferObject ubo{};
+    ubo.view = to_daxa(camera.get_view_matrix());
+    ubo.proj = to_daxa(camera.get_projection(aspect_ratio));
 
-    auto* ptr = device.buffer_host_address_as<UniformBufferObject>(uniform_buffer_id).value();
+    auto* ptr = device.buffer_host_address_as<meshRenderer::UniformBufferObject>(uniform_buffer_id).value();
+    *ptr = ubo;
+}
+
+void Renderer::update_skybox_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio) {
+    skyboxRenderer::UniformBufferObject ubo{};
+    ubo.view_rot = to_daxa(camera.get_view_rot_matrix());
+    ubo.proj = to_daxa(camera.get_projection(aspect_ratio));
+
+    auto* ptr = device.buffer_host_address_as<skyboxRenderer::UniformBufferObject>(uniform_buffer_id).value();
     *ptr = ubo;
 }
 
@@ -144,16 +203,28 @@ void Renderer::init() {
         .name = "pipeline manager",
     });
 
-    uniform_buffer_id = device.create_buffer({
-        .size = sizeof(UniformBufferObject),
+    mesh_uniform_buffer_id = device.create_buffer({
+        .size = sizeof(meshRenderer::UniformBufferObject),
         .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
-        .name = "Uniform buffer MVP",
+        .name = "mesh uniform buffer MVP",
     });
 
-    task_uniform_buffer = daxa::TaskBuffer({
-        .initial_buffers = {.buffers = std::span{&uniform_buffer_id, 1}},
-        .name = "task uniform buffer",
+    task_mesh_uniform_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&mesh_uniform_buffer_id, 1}},
+        .name = "task mesh uniform buffer",
     });
+
+    skybox_uniform_buffer_id = device.create_buffer({
+        .size = sizeof(skyboxRenderer::UniformBufferObject),
+        .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+        .name = "skybox uniform buffer MVP",
+    });
+
+    task_skybox_uniform_buffer = daxa::TaskBuffer({
+        .initial_buffers = {.buffers = std::span{&skybox_uniform_buffer_id, 1}},
+        .name = "task skybox uniform buffer",
+    });
+
     // Create the z-buffer
     z_buffer_id = device.create_image({
         .format = daxa::Format::D32_SFLOAT,
@@ -169,7 +240,8 @@ void Renderer::init() {
 
     task_swapchain_image = daxa::TaskImage{ {.swapchain_image = true, .name = "swapchain image"} };
 
-    loop_task_graph.use_persistent_buffer(task_uniform_buffer);
+    loop_task_graph.use_persistent_buffer(task_mesh_uniform_buffer);
+    loop_task_graph.use_persistent_buffer(task_skybox_uniform_buffer);
     loop_task_graph.use_persistent_image(task_z_buffer);
     loop_task_graph.use_persistent_image(task_swapchain_image);
 
@@ -190,12 +262,8 @@ void Renderer::init() {
 }
 
 void Renderer::submit_task_graph() {
-    bool firstDrawMeshTask = true;
-    // TODO: abstractify the task addition
-    for (auto& drawGroup : drawGroups) {
-        draw_mesh_task(drawGroup, firstDrawMeshTask);
-        firstDrawMeshTask = false;
-    }
+    draw_skybox_task();
+    draw_mesh_task();
 
     loop_task_graph.submit({});
     // And tell the task graph to do the present step.
@@ -210,7 +278,8 @@ void Renderer::cleanup() {
         drawGroup.cleanup();
     }
     device.destroy_image(z_buffer_id);
-    device.destroy_buffer(uniform_buffer_id);
+    device.destroy_buffer(mesh_uniform_buffer_id);
+    device.destroy_buffer(skybox_uniform_buffer_id);
 }
 
 void Renderer::startFrame(const Camera& camera) {
@@ -231,7 +300,8 @@ void Renderer::startFrame(const Camera& camera) {
     }
 
     float aspect_ratio = static_cast<float>(window.width) / static_cast<float>(window.height);
-    update_uniform_buffer(device, uniform_buffer_id, camera, aspect_ratio);
+    update_mesh_uniform_buffer(device, mesh_uniform_buffer_id, camera, aspect_ratio);
+    update_skybox_uniform_buffer(device, skybox_uniform_buffer_id, camera, aspect_ratio);
 }
 
 void Renderer::endFrame() {

@@ -1,15 +1,15 @@
 #pragma once
 
 #include "window.h"
-#include "shared.inl"
+#include "mesh_rendering_shared.inl"
+#include "skybox_rendering_shared.inl"
+
+#include "Renderer/Skybox/Skybox.h"
 
 #undef Drawable
-// #include "Renderer/Drawable.h"
 #include "Renderer/Meshes/DrawGroup.h"
-// #include "Renderer/TextureHandle.h"
 
 #include "Core/Camera.h"
-// #include "Core/InputSystem.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -33,10 +33,15 @@ struct Renderer {
     daxa::Swapchain swapchain;
     daxa::PipelineManager pipeline_manager;
 
+    Skybox skybox;
     std::vector<DrawGroup> drawGroups;
 
-    daxa::BufferId uniform_buffer_id;
-    daxa::TaskBuffer task_uniform_buffer;
+    daxa::BufferId mesh_uniform_buffer_id;
+    daxa::BufferId skybox_uniform_buffer_id;
+
+    daxa::TaskBuffer task_mesh_uniform_buffer;
+    daxa::TaskBuffer task_skybox_uniform_buffer;
+    
     daxa::ImageId z_buffer_id;
     daxa::TaskImage task_z_buffer;
     daxa::TaskImage task_swapchain_image;
@@ -46,13 +51,15 @@ struct Renderer {
 
     Renderer(GLFW_Window::AppWindow& window, daxa::Device& device, daxa::Instance& instance);
 
-    static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const UniformBufferObject &ubo);
+    static void upload_uniform_buffer_task(daxa::TaskGraph& tg, daxa::TaskBufferView uniform_buffer, const meshRenderer::UniformBufferObject &ubo);
 
-    void draw_mesh_task(const DrawGroup& drawGroup, bool clear = false);
+    void draw_mesh_task();
+    void draw_skybox_task();
 
     void registerDrawGroup(DrawGroup&& drawGroup);
 
-    static void update_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
+    static void update_mesh_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
+    static void update_skybox_uniform_buffer(const daxa::Device& device, daxa::BufferId uniform_buffer_id, Camera camera, float aspect_ratio);
 
     void init();
     void submit_task_graph();

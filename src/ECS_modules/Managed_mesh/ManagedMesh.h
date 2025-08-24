@@ -1,8 +1,8 @@
 #pragma once
 
-#include "DrawableMesh.h"
-#include "DrawGroup.h"
-#include "shared.inl"
+#include "Renderer/Meshes/DrawableMesh.h"
+#include "Renderer/Meshes/DrawGroup.h"
+#include "mesh_rendering_shared.inl"
 
 #include "Core/ECS/ECS_Component.h"
 #include "Renderer/MeshManager.h"
@@ -21,21 +21,12 @@ public:
 
     ManagedMesh(GLTF_Loader& loader, int meshNo, int primitiveNo, MeshManager& meshManager, DrawGroup& drawGroup, const Renderer& renderer, TextureData texture)
         : transform(), textures() {
-        // Add a new mesh
-        // mesh = meshManager.add_mesh(loader.path + std::to_string(meshNo) + std::to_string(primitiveNo),
-        //     loader.getModelData(meshNo, primitiveNo).vertexCount,
-        //     loader.getModelData(meshNo, primitiveNo).indexCount);
-        // 
-        // meshManager.upload_mesh_data_task(meshManager.upload_task_graph, 
-        //     loader.getModelData(meshNo, primitiveNo).vertices,
-        //     loader.getModelData(meshNo, primitiveNo).indices);
-
         mesh = meshManager.add_mesh(loader.path + std::to_string(meshNo) + std::to_string(primitiveNo), loader.getModelData(meshNo, primitiveNo));
 
         drawGroup.register_mesh(meshManager.get_mesh_ptr(meshManager.meshIndex), renderer.loop_task_graph);
 
         mesh.lock()->instance_data.push_back({
-            .model_matrix = glm::mat4(1.0f),
+            .model_matrix = to_daxa(glm::mat4(1.0f)),
             .texture = texture.albedo,
             .tex_sampler = texture.tex_sampler
         });
@@ -46,7 +37,7 @@ public:
         // Add an instanced mesh
 
         mesh.lock()->instance_data.push_back({
-            .model_matrix = glm::mat4(1.0f),
+            .model_matrix = to_daxa(glm::mat4(1.0f)),
             .texture = texture.albedo,
             .tex_sampler = texture.tex_sampler
         });
@@ -59,7 +50,7 @@ public:
         } else std::cerr << "Warning: instantiate failed: only the first instance of a mesh can instantiate meshes\n";
     }
 
-    [[nodiscard]] PerInstanceData& getInstanceData() const {
+    [[nodiscard]] meshRenderer::PerInstanceData& getInstanceData() const {
         return mesh.lock()->instance_data[instanceNo];
     }
 

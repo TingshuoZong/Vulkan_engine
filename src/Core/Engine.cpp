@@ -1,11 +1,11 @@
 #include "Engine.h"
 
 #include "window.h"
-#include "shared.inl"
+#include "mesh_rendering_shared.inl"
+#include "skybox_rendering_shared.inl"
 
 #include "Renderer/Meshes/DrawableMesh.h"
 #include "Renderer/Meshes/DrawGroup.h"
-#include "Renderer/Meshes/ManagedMesh.h"
 #include "Renderer/Textures/TextureHandle.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/MeshManager.h"
@@ -16,9 +16,11 @@
 
 #include "Tools/Model_loader.h"
 
+#include "ECS_modules/Managed_mesh/ManagedMesh.h"
+
 #include "ECS/ECS.h"
 
-#include "Transform/Transform_component.h"
+#include "ECS_modules/Transform/Transform_component.h"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -32,6 +34,7 @@
 constexpr float MAX_DELTA_TIME = 0.1f;
 
 int init() {
+    ///@brief Sets up a window, daxa instance and a @ref Renderer
     auto window = GLFW_Window::AppWindow("Hur Dur", 1600, 900);
 
     daxa::Instance instance = daxa::create_instance({});
@@ -46,12 +49,56 @@ int init() {
     });
     renderer.init();
 
-    std::shared_ptr<daxa::RasterPipeline> pipeline;
+    std::shared_ptr<daxa::RasterPipeline> skybox_rendering_pipeline;
     {
         auto result = renderer.pipeline_manager.add_raster_pipeline2({
-            .vertex_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.vert.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
-            .fragment_shader_info = daxa::ShaderCompileInfo2{.source = daxa::ShaderFile{"main.frag.glsl"}, .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} },
+            .vertex_shader_info = daxa::ShaderCompileInfo2{
+                .source = daxa::ShaderFile("skybox_rendering.vert.glsl"), 
+                .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} 
+            },
+            .fragment_shader_info = daxa::ShaderCompileInfo2{
+                .source = daxa::ShaderFile("skybox_rendering.frag.glsl"),
+                .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} 
+            },
             .color_attachments = {{.format = renderer.swapchain.get_format()}},
+            .depth_test = daxa::DepthTestInfo{
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_write = false,
+                .depth_test_compare_op = daxa::CompareOp::LESS_OR_EQUAL,
+                .min_depth_bounds = 0.0f,
+                .max_depth_bounds = 1.0f,
+            },
+            .raster = daxa::RasterizerInfo{
+                .face_culling = daxa::FaceCullFlagBits::NONE,
+                .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
+            },
+            .push_constant_size = sizeof(skyboxRenderer::PushConstant),  // HUST CHANGE!!!!!!!
+            .name = "skybox sampling",
+        });
+
+        if (result.is_err()) {
+            std::cerr << result.message() << std::endl;
+            return -1;
+        }
+        skybox_rendering_pipeline = result.value();
+    }
+
+    ///@brief This is the mesh rendering pipeline and is what is going to be used to combine all the lighting
+    std::shared_ptr<daxa::RasterPipeline> mesh_rendering_pipeline;
+    {
+        auto result = renderer.pipeline_manager.add_raster_pipeline2({
+            .vertex_shader_info = daxa::ShaderCompileInfo2{
+                .source = daxa::ShaderFile{"mesh_rendering.vert.glsl"},
+                .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} 
+            },
+            .fragment_shader_info = daxa::ShaderCompileInfo2{
+                .source = daxa::ShaderFile{"mesh_rendering.frag.glsl"}, 
+                .defines = { {"DAXA_SHADER", "1"}, {"GLSL", "1"}} 
+            },
+            .color_attachments = {
+                {
+                    .format = renderer.swapchain.get_format(),
+                }},
             .depth_test = daxa::DepthTestInfo{
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,
                 .enable_depth_write = true,                      // enable writing to depth buffer
@@ -63,15 +110,15 @@ int init() {
                 .face_culling = daxa::FaceCullFlagBits::BACK_BIT,
                 .front_face_winding = daxa::FrontFaceWinding::COUNTER_CLOCKWISE,
             },
-            .push_constant_size = sizeof(PushConstant),
-            .name = "my pipeline",
+            .push_constant_size = sizeof(meshRenderer::PushConstant),
+            .name = "mesh rendering",
             });
 
         if (result.is_err()) {
             std::cerr << result.message() << std::endl;
             return -1;
         }
-        pipeline = result.value();
+        mesh_rendering_pipeline = result.value();
     }
 
     daxa::SamplerId sampler = device.create_sampler({
@@ -83,8 +130,9 @@ int init() {
     });
 
 // -----------------------------------------------------------------------------------------------------------------
+    ///@brief Creates a @ref MeshManager, @ref DrawGroup and registers the drawgroup with the @ref Renderer so it gets put in the @ref Renderer::draw_mesh_task
     MeshManager meshManager(device);
-    DrawGroup drawGroup(device, pipeline, "My DrawGroup");
+    DrawGroup drawGroup(device, mesh_rendering_pipeline, "My DrawGroup");
     renderer.registerDrawGroup(std::move(drawGroup));
 
     BulkTextureUploadManager uploadManager;
@@ -99,6 +147,7 @@ int init() {
     ecs::entityManager.registerComponentManager<TransformComponent>();
     ecs::entityManager.registerSystem<TransformSystem>(device, renderer, ecs::entityManager.getComponentManager<ManagedMesh>());
 
+    // Meshes
     {
         GLTF_Loader loader;
         loader.OpenFile("C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf");    //"C:/dev/Engine_project/assets/Sponza_glTF/Sponza.gltf"
@@ -124,6 +173,18 @@ int init() {
             }
         }
     }
+
+    daxa::ImageViewId skybox_view;
+    std::unique_ptr<TextureHandle> skyboxTexture = std::make_unique<TextureHandle>(device);
+    BulkTextureUploadManager skyboxUploadManager;
+
+    // Skybox texture upload
+    {
+        skyboxTexture->stream_texture_from_memory("textures/skybox.png", "skybox", skyboxUploadManager);
+        skybox_view = skyboxUploadManager.bulkUploadTextures(meshManager.upload_task_graph, "Skybox ")[0];
+    }
+    renderer.skybox = Skybox(&device, skybox_rendering_pipeline, skybox_view, sampler);
+    //renderer.skybox.uploadBuffers(meshManager.upload_task_graph);
 
     // int grid_size = 5;
 	// float spacing = 0.08f;
@@ -168,7 +229,7 @@ int init() {
     auto last_frame_time = static_cast<float>(glfwGetTime());
     ecs::updateSystems();
 
-    // Main loop
+    ///@brief Main game loop
     while (!window.should_close()) {
         auto current_time = static_cast<float>(glfwGetTime());
 
@@ -220,6 +281,7 @@ int init() {
     for (auto& texture : textures) {
         texture->cleanup();
     }
+    skyboxTexture->cleanup();
 
     device.destroy_sampler(sampler);
 
