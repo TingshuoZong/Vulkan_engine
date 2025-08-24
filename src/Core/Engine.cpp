@@ -175,15 +175,13 @@ int init() {
     }
 
     daxa::ImageViewId skybox_view;
-    BulkTextureUploadManager skyboxUploadManager;
     std::unique_ptr<TextureHandle> skyboxTexture = std::make_unique<TextureHandle>(device);
+    BulkTextureUploadManager skyboxUploadManager;
 
     // Skybox texture upload
     {
         skyboxTexture->stream_texture_from_memory("textures/skybox.png", "skybox", skyboxUploadManager);
         skybox_view = skyboxUploadManager.bulkUploadTextures(meshManager.upload_task_graph, "Skybox ")[0];
-
-
     }
     renderer.skybox = Skybox(&device, skybox_rendering_pipeline, skybox_view, sampler);
     //renderer.skybox.uploadBuffers(meshManager.upload_task_graph);

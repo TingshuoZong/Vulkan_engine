@@ -11,13 +11,16 @@
 constexpr const char* TEXTURE_PATH = "C:/dev/Engine_project/assets/";
 
 struct UploadData {
-    daxa::TaskBuffer task_texture_staging;
-    daxa::TaskImage task_texture_image;
-    daxa::ImageId image;
+    daxa::TaskBuffer& task_texture_staging;
+    daxa::TaskImage& task_texture_image;
+    daxa::ImageId& image;
 
     uint32_t width;
     uint32_t height;
 };
+
+// Just a forward declration
+struct TextureHandle;
 
 /**
  * @brief The manager that acually queues up all the textures to be uploaded and submits its to the GPU
@@ -28,13 +31,20 @@ struct UploadData {
  */
 class BulkTextureUploadManager {
 public:
-    void submitUpload(const UploadData& uploadData) { uploads.push_back(uploadData); }
+    //void submitUpload(const UploadData& uploadData) { uploads.push_back(uploadData); }
+    void submitUpload2(TextureHandle* textureHandle) { uploads.push_back(textureHandle); }
     std::vector <daxa::ImageViewId> bulkUploadTextures(daxa::TaskGraph& taskGraph, const std::string& name);
 private:
-    std::vector<UploadData> uploads;
+    std::vector<TextureHandle*> uploads;
+    //std::vector<UploadData> uploads;
     std::vector<daxa::ImageViewId> views;
 };
 
+/**
+* @brief The actual thing that stores the task_texture_image, to free the gpu memory this can just be dropped
+* 
+* @warning Since TextureHandle uses the #c this pointer to add itself to the @ref BulkTextureUploadManager it should never be directly stored in a @c std::vector due to pointer invalidation after reallocation
+*/
 struct TextureHandle {
     int width;
     int height;
@@ -60,5 +70,4 @@ struct TextureHandle {
     void stream_texture_from_memory(const std::string& fileName, const std::string &debug_name, BulkTextureUploadManager& manager);
     void stream_texture_from_data(const tinygltf::Image& gltf_image, std::string debug_name, BulkTextureUploadManager& manager);
     inline void load_textures_into_buffers(const stbi_uc* pixels, uint32_t size_bytes, BulkTextureUploadManager& manager);
-    daxa::ImageViewId load_texture(daxa::TaskGraph& task_graph);
 };
