@@ -43,7 +43,7 @@ inline void TextureHandle::load_textures_into_buffers(const stbi_uc* pixels, uin
         .format = daxa::Format::R8G8B8A8_UNORM,
         .size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
         .usage = daxa::ImageUsageFlagBits::TRANSFER_DST | daxa::ImageUsageFlagBits::SHADER_SAMPLED,
-        .name = name + " texture image"
+        .name = name + " texture image",
     });
 
     task_texture_image = daxa::TaskImage({
@@ -67,27 +67,97 @@ inline void TextureHandle::load_textures_into_buffers(const stbi_uc* pixels, uin
         std::memcpy(ptr, pixels, size_bytes);
     }
 
-    manager.submitUpload({task_texture_staging, task_texture_image, image, static_cast<uint32_t>(width), static_cast<uint32_t>(height)});
+    UploadData uploadData {
+        .task_texture_staging = task_texture_staging,
+        .task_texture_image = task_texture_image,
+        .image = image,
+        .width = static_cast<uint32_t>(width),
+        .height = static_cast<uint32_t>(height),
+    };
+    //manager.submitUpload(uploadData);
+    manager.submitUpload2(this);
 }
 
-std::vector<daxa::ImageViewId> BulkTextureUploadManager::bulkUploadTextures(daxa::TaskGraph &taskGraph, const std::string& name) {
+//std::vector<daxa::ImageViewId> BulkTextureUploadManager::bulkUploadTextures(daxa::TaskGraph &taskGraph, const std::string& name) {
+//
+//    for (auto& upload : uploads) {
+//        taskGraph.use_persistent_buffer(upload.task_texture_staging);
+//        taskGraph.use_persistent_image(upload.task_texture_image);
+//    }
+//
+//    std::vector<daxa::TaskAttachmentInfo> result;
+//
+//    for (auto& upload : uploads) {
+//        result.emplace_back(daxa::TaskAttachmentInfo{daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_READ, upload.task_texture_staging.view())});
+//        result.emplace_back(daxa::TaskAttachmentInfo{daxa::inl_attachment(daxa::TaskImageAccess::TRANSFER_WRITE, upload.task_texture_image.view())});
+//    }
+//
+//    taskGraph.add_task({
+//        .attachments = result,
+//        .task = [&](const daxa::TaskInterface &ti) {
+//            for (auto& upload : uploads) {
+//                ti.recorder.pipeline_barrier_image_transition({
+//                    .src_access = daxa::AccessConsts::NONE,
+//                    .dst_access = daxa::AccessConsts::TRANSFER_WRITE,
+//                    .src_layout = daxa::ImageLayout::UNDEFINED,
+//                    .dst_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+//                    .image_slice = {
+//                        .base_mip_level = 0,
+//                        .level_count = 1,
+//                        .base_array_layer = 0,
+//                        .layer_count = 1
+//                    },
+//                    .image_id = ti.get(upload.task_texture_image).ids[0],
+//                }),
+//                ti.recorder.copy_buffer_to_image({
+//                    .buffer = ti.get(upload.task_texture_staging).ids[0],
+//                    .image = ti.get(upload.task_texture_image).ids[0],
+//                    .image_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+//                    .image_extent = {static_cast<uint32_t>(upload.width), static_cast<uint32_t>(upload.height), 1}
+//                }),
+//                ti.recorder.pipeline_barrier_image_transition({
+//                    .src_access = daxa::AccessConsts::TRANSFER_WRITE,
+//                    .dst_access = daxa::AccessConsts::FRAGMENT_SHADER_READ,
+//                    .src_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+//                    .dst_layout = daxa::ImageLayout::READ_ONLY_OPTIMAL,
+//                    .image_slice = {
+//                        .base_mip_level = 0,
+//                        .level_count = 1,
+//                        .base_array_layer = 0,
+//                        .layer_count = 1
+//                    },
+//                    .image_id = ti.get(upload.task_texture_image).ids[0],
+//                });
+//            }
+//        },
+//        .name = name + " upload"
+//    });
+//
+//    for (auto& upload : uploads) {
+//        views.push_back(upload.image.default_view());
+//    }
+//
+//    return std::move(views);
+//}
 
-    for (auto& upload : uploads) {
-        taskGraph.use_persistent_buffer(upload.task_texture_staging);
-        taskGraph.use_persistent_image(upload.task_texture_image);
+std::vector<daxa::ImageViewId> BulkTextureUploadManager::bulkUploadTextures(daxa::TaskGraph& taskGraph, const std::string& name) {
+
+    for (auto upload : uploads) {
+        taskGraph.use_persistent_buffer(upload->task_texture_staging);
+        taskGraph.use_persistent_image(upload->task_texture_image);
     }
 
     std::vector<daxa::TaskAttachmentInfo> result;
 
-    for (auto& upload : uploads) {
-        result.emplace_back(daxa::TaskAttachmentInfo{daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_READ, upload.task_texture_staging.view())});
-        result.emplace_back(daxa::TaskAttachmentInfo{daxa::inl_attachment(daxa::TaskImageAccess::TRANSFER_WRITE, upload.task_texture_image.view())});
+    for (auto upload : uploads) {
+        result.emplace_back(daxa::TaskAttachmentInfo{ daxa::inl_attachment(daxa::TaskBufferAccess::TRANSFER_READ, upload->task_texture_staging.view()) });
+        result.emplace_back(daxa::TaskAttachmentInfo{ daxa::inl_attachment(daxa::TaskImageAccess::TRANSFER_WRITE, upload->task_texture_image.view()) });
     }
 
     taskGraph.add_task({
         .attachments = result,
-        .task = [&](const daxa::TaskInterface &ti) {
-            for (auto& upload : uploads) {
+        .task = [&](const daxa::TaskInterface& ti) {
+            for (auto upload : uploads) {
                 ti.recorder.pipeline_barrier_image_transition({
                     .src_access = daxa::AccessConsts::NONE,
                     .dst_access = daxa::AccessConsts::TRANSFER_WRITE,
@@ -99,13 +169,13 @@ std::vector<daxa::ImageViewId> BulkTextureUploadManager::bulkUploadTextures(daxa
                         .base_array_layer = 0,
                         .layer_count = 1
                     },
-                    .image_id = ti.get(upload.task_texture_image).ids[0],
+                    .image_id = ti.get(upload->task_texture_image).ids[0],
                 }),
                 ti.recorder.copy_buffer_to_image({
-                    .buffer = ti.get(upload.task_texture_staging).ids[0],
-                    .image = ti.get(upload.task_texture_image).ids[0],
+                    .buffer = ti.get(upload->task_texture_staging).ids[0],
+                    .image = ti.get(upload->task_texture_image).ids[0],
                     .image_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    .image_extent = {static_cast<uint32_t>(upload.width), static_cast<uint32_t>(upload.height), 1}
+                    .image_extent = {static_cast<uint32_t>(upload->width), static_cast<uint32_t>(upload->height), 1}
                 }),
                 ti.recorder.pipeline_barrier_image_transition({
                     .src_access = daxa::AccessConsts::TRANSFER_WRITE,
@@ -118,15 +188,15 @@ std::vector<daxa::ImageViewId> BulkTextureUploadManager::bulkUploadTextures(daxa
                         .base_array_layer = 0,
                         .layer_count = 1
                     },
-                    .image_id = ti.get(upload.task_texture_image).ids[0],
+                    .image_id = ti.get(upload->task_texture_image).ids[0],
                 });
             }
         },
         .name = name + " upload"
-    });
+        });
 
-    for (auto& upload : uploads) {
-        views.push_back(upload.image.default_view());
+    for (auto upload : uploads) {
+        views.push_back(upload->image.default_view());
     }
 
     return std::move(views);

@@ -1,6 +1,6 @@
 #extension GL_EXT_debug_printf : enable
 
-#include <shared.inl>
+#include <mesh_rendering_shared.inl>
 
 // Enabled the push constant PushConstant we specified in shared.inl
 DAXA_DECL_PUSH_CONSTANT(PushConstant, push)
